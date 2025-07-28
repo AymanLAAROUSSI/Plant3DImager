@@ -1,0 +1,86 @@
+Architecture complète du projet :
+
+plant_robotics_system/
+├── core/                              # Composants partagés
+│   ├── __init__.py
+│   ├── hardware/                      # Contrôleurs matériels
+│   │   ├── __init__.py
+│   │   ├── cnc_controller.py          # Contrôle du CNC
+│   │   ├── camera_controller.py       # Contrôle de la caméra
+│   │   └── gimbal_controller.py       # Contrôle de la gimbal (mise à jour avec invert_tilt)
+│   ├── geometry/                      # Calculs géométriques
+│   │   ├── __init__.py
+│   │   ├── path_calculator.py         # Calcul de trajectoires
+│   │   └── angle_calculator.py        # Calcul d'angles pour la caméra
+│   ├── data/                          # Gestion des données
+│   │   ├── __init__.py
+│   │   └── storage_manager.py         # Gestion des fichiers/répertoires
+│   └── utils/                         # Utilitaires
+│       ├── __init__.py
+│       └── config.py                  # Configuration partagée
+│
+├── acquisition/                       # Module d'acquisition d'images
+│   ├── __init__.py
+│   ├── circle_acquisition.py          # Classe principale d'acquisition
+│   └── metadata_generator.py          # Génération des métadonnées
+│
+├── targeting/                         # Module de ciblage de feuilles
+│   ├── __init__.py
+│   ├── leaf_targeting.py              # Classe principale de ciblage
+│   └── modules/                       # Modules spécifiques au ciblage
+│       ├── __init__.py
+│       ├── data_manager.py            # Gestion des nuages de points
+│       ├── leaf_analyzer.py           # Analyse des feuilles
+│       ├── path_planner.py            # Planification des trajectoires
+│       ├── robot_controller.py        # Contrôle spécifique au ciblage (mise à jour pour utiliser invert_tilt)
+│       ├── interactive_selector.py    # Sélection interactive
+│       └── visualization.py           # Visualisation des données
+│
+├── manual_control/                    # Module de contrôle manuel
+│   ├── __init__.py
+│   └── manual_controller.py           # Classe principale de contrôle manuel
+│
+├── scripts/                           # Scripts d'exécution
+│   ├── run_acquisition.py             # Lancement de l'acquisition
+│   ├── run_targeting.py               # Lancement du ciblage
+│   └── run_manual.py                  # Lancement du contrôle manuel
+│
+├── main.py                            # Point d'entrée principal
+│
+└── results/                           # Répertoire pour tous les résultats
+    ├── plant_acquisition/             # Résultats d'acquisition
+    │   └── circular_scan_YYYYMMDD-HHMMSS/
+    │       ├── images/                # Photos brutes
+    │       ├── metadata/              # Métadonnées générales
+    │       │   └── images/            # Métadonnées par image
+    │       ├── files.json             # Informations sur les fichiers
+    │       └── scan.toml              # Configuration de scan
+    │
+    ├── leaf_targeting/                # Résultats de ciblage
+    │   └── leaf_analysis_YYYYMMDD-HHMMSS/
+    │       ├── images/                # Photos des feuilles
+    │       ├── analysis/              # Données d'analyse
+    │       └── visualizations/        # Visualisations
+    │
+    └── manual_control/                # Photos prises en mode manuel
+
+Points d'entrée et modes d'exécution : 
+-- main.py : 
+# Mode acquisition d'images en cercle
+python main.py --mode acquisition [--args --circles 2 --positions 60]
+
+# Mode ciblage de feuilles
+python main.py --mode targeting [--args /chemin/vers/nuage.ply]
+
+# Mode contrôle manuel
+python main.py --mode manual
+
+-- Scripts directs :
+# Acquisition
+python scripts/run_acquisition.py --circles 2 --positions 60
+
+# Ciblage
+python scripts/run_targeting.py /chemin/vers/nuage.ply
+
+# Contrôle manuel
+python scripts/run_manual.py
