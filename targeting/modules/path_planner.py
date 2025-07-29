@@ -12,14 +12,14 @@ from core.geometry.path_calculator import calculate_circle_positions, find_close
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-def plan_safe_path(circle_position, leaf_position, leaf_distance=0.1):
+def plan_safe_path(circle_position, target_point, leaf_position):
     """
     Planifie une trajectoire sûre entre un point sur le cercle et une feuille
     
     Args:
         circle_position: Position sur le cercle [x, y, z]
+        target_point: Position cible près de la feuille [x, y, z] (déjà calculée avec la distance appropriée)
         leaf_position: Position de la feuille (centroïde) [x, y, z]
-        leaf_distance: Distance à la feuille en mètres (défaut: 0.1 m)
     
     Returns:
         Liste de dictionnaires décrivant la trajectoire
@@ -27,29 +27,10 @@ def plan_safe_path(circle_position, leaf_position, leaf_distance=0.1):
     # Convertir les positions en numpy arrays pour faciliter les calculs
     circle_pos = np.array(circle_position)
     leaf_pos = np.array(leaf_position)
+    target_pos = np.array(target_point)
     
-    # Calculer le vecteur de direction du cercle vers la feuille
-    direction = leaf_pos - circle_pos
-    distance = np.linalg.norm(direction)
-    
-    if distance < 1e-6:
-        # Si les positions sont trop proches, retourner une trajectoire vide
-        return []
-    
-    # Normaliser le vecteur de direction
-    direction = direction / distance
-    
-    # CORRECTION: Calculer le point cible à la distance spécifiée de la feuille
-    # Nous prenons un vecteur de la feuille vers le cercle, puis avançons depuis la feuille
-    leaf_to_circle = circle_pos - leaf_pos
-    leaf_to_circle_norm = leaf_to_circle / np.linalg.norm(leaf_to_circle)
-    
-    # Calculer la position cible (à leaf_distance mètres de la feuille)
-    target_pos = leaf_pos + leaf_to_circle_norm * leaf_distance
-    
-    # Afficher des informations de débogage sur la distance
+    # Calculer la distance réelle entre la feuille et le point cible
     real_distance = np.linalg.norm(target_pos - leaf_pos)
-    print(f"DEBUG: Distance demandée: {leaf_distance} m")
     print(f"DEBUG: Distance calculée entre le point cible et la feuille: {real_distance:.3f} m")
     
     # Créer la trajectoire
@@ -71,11 +52,11 @@ def plan_safe_path(circle_position, leaf_position, leaf_distance=0.1):
         "comment": "Approche de la feuille"
     })
     
-    # Point cible près de la feuille
+    # Point cible près de la feuille (utilise directement le point précalculé)
     path.append({
         "position": target_pos.tolist(),
         "type": "target",
-        "comment": f"Point cible près de la feuille (distance: {leaf_distance:.3f} m)"
+        "comment": f"Point cible près de la feuille (distance: {real_distance:.3f} m)"
     })
     
     # Chemin de retour (le même que l'aller mais en sens inverse)
@@ -88,7 +69,7 @@ def plan_safe_path(circle_position, leaf_position, leaf_distance=0.1):
     return path
 
 def plan_complete_path(start_position, target_points, center_point, circle_radius, 
-                      num_circle_points, leaf_distance=0.1):
+                      num_circle_points, leaf_distance=None):
     """
     Planifie une trajectoire complète incluant le cercle et les approches des feuilles
     
@@ -98,11 +79,14 @@ def plan_complete_path(start_position, target_points, center_point, circle_radiu
         center_point: Centre du cercle [x, y, z]
         circle_radius: Rayon du cercle
         num_circle_points: Nombre de points sur le cercle
-        leaf_distance: Distance aux feuilles cibles en mètres (défaut: 0.1 m)
+        leaf_distance: Paramètre ignoré, conservé pour compatibilité (distance déjà prise en compte)
     
     Returns:
         Liste de dictionnaires décrivant la trajectoire complète
     """
+    if leaf_distance is not None:
+        print(f"Note: Le paramètre 'leaf_distance' est ignoré car la distance est déjà prise en compte dans les points cibles")
+    
     if not target_points:
         return []
     
@@ -157,8 +141,12 @@ def plan_complete_path(start_position, target_points, center_point, circle_radiu
                     "comment": f"Position {pos_index} sur le cercle (vers feuille {i+1})"
                 })
         
+        # Utiliser le target_point précalculé directement (déjà à la bonne distance)
+        # Pour cela, nous avons besoin de la position de la feuille (centroïde)
+        leaf_position = target_point  # Pour maintenir la compatibilité avec plan_safe_path
+        
         # Planifier le chemin d'approche vers la feuille
-        approach_path = plan_safe_path(leaf_circle_pos, target_point, leaf_distance)
+        approach_path = plan_safe_path(leaf_circle_pos, target_point, leaf_position)
         
         # Ajouter le chemin d'approche (ignorer le premier point qui est déjà sur le cercle)
         path.extend(approach_path[1:])
@@ -166,10 +154,41 @@ def plan_complete_path(start_position, target_points, center_point, circle_radiu
         # Mettre à jour le point de départ pour la prochaine feuille
         start_pos_index = leaf_pos_index
     
-    # Ajouter le retour à la position de départ
+    # ===== NOUVELLE PARTIE: RETOUR SÉCURISÉ À LA POSITION INITIALE =====
+    # Trouver le point le plus proche sur le cercle par rapport à la position de départ
+    end_pos_index = find_closest_point_index(circle_positions, start_position)
+    
+    # Déterminer le chemin le plus court sur le cercle pour revenir au point proche de la position de départ
+    clockwise_distance = (end_pos_index - start_pos_index) % len(circle_positions)
+    counterclockwise_distance = (start_pos_index - end_pos_index) % len(circle_positions)
+    
+    print(f"Planification du retour via le cercle: position actuelle {start_pos_index}, point cible {end_pos_index}")
+    
+    if clockwise_distance <= counterclockwise_distance:
+        # Sens horaire
+        print(f"Retour dans le sens horaire: {clockwise_distance} points")
+        for j in range(1, clockwise_distance + 1):
+            pos_index = (start_pos_index + j) % len(circle_positions)
+            path.append({
+                "position": circle_positions[pos_index],
+                "type": "via_point",
+                "comment": f"Position {pos_index} sur le cercle (retour)"
+            })
+    else:
+        # Sens anti-horaire
+        print(f"Retour dans le sens anti-horaire: {counterclockwise_distance} points")
+        for j in range(1, counterclockwise_distance + 1):
+            pos_index = (start_pos_index - j) % len(circle_positions)
+            path.append({
+                "position": circle_positions[pos_index],
+                "type": "via_point",
+                "comment": f"Position {pos_index} sur le cercle (retour)"
+            })
+    
+    # Seulement maintenant, ajouter le retour à la position de départ
     path.append({
         "position": start_position,
-        "type": "via_point",
+        "type": "end",
         "comment": "Retour à la position de départ"
     })
     
@@ -206,6 +225,9 @@ def visualize_path(path, points=None, target_point=None, save_path=None):
         elif point["type"] == "target":
             ax.scatter(pos[0], pos[1], pos[2], color='red', s=50)
             ax.text(pos[0], pos[1], pos[2], f"Target {i}", color='red')
+        elif point["type"] == "end":
+            ax.scatter(pos[0], pos[1], pos[2], color='purple', s=50)
+            ax.text(pos[0], pos[1], pos[2], "End", color='purple')
     
     # Afficher le nuage de points si fourni
     if points is not None:
@@ -278,6 +300,9 @@ def visualize_complete_path(path, points, leaf_points_list=None, leaf_normals_li
         elif point["type"] == "target":
             ax.scatter(pos[0], pos[1], pos[2], color='red', s=50)
             ax.text(pos[0], pos[1], pos[2], f"T{i}", color='red')
+        elif point["type"] == "end":
+            ax.scatter(pos[0], pos[1], pos[2], color='purple', s=50)
+            ax.text(pos[0], pos[1], pos[2], "Fin", color='purple')
     
     # Afficher le nuage de points global (sous-échantillonné pour la performance)
     if len(points) > 5000:

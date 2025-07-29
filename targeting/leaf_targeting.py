@@ -48,7 +48,7 @@ class LeafTargeting:
         self.simulate = False
         self.auto_photo = False
         self.louvain_coeff = 0.5
-        self.distance = 0.1  # Distance par défaut aux feuilles cibles (10 cm)
+        self.distance = 0.4  # Distance par défaut aux feuilles cibles modifiée à 40 cm
         
         # Mettre à jour les paramètres avec les arguments de la ligne de commande
         if args:
@@ -211,7 +211,9 @@ class LeafTargeting:
             
             # 8. Extraire les données des feuilles
             print("\n=== 8. Extraction des données des feuilles ===")
-            self.leaves_data = extract_leaf_data_from_communities(communities, self.alpha_points)
+            self.leaves_data = extract_leaf_data_from_communities(
+                communities, self.alpha_points, distance=self.distance
+            )
             
             # Sauvegarder les données
             leaves_json = os.path.join(self.session_dirs["analysis"], "leaves_data.json")
@@ -239,10 +241,10 @@ class LeafTargeting:
             # Extraire les points cibles
             target_points = [leaf["target_point"] for leaf in self.selected_leaves]
             
-            # Planifier la trajectoire complète avec la distance personnalisée
+            # Planifier la trajectoire complète - la distance est déjà prise en compte dans les target_points
             complete_path = plan_complete_path(
                 current_position, target_points, config.CENTER_POINT, config.CIRCLE_RADIUS, 
-                config.NUM_POSITIONS, leaf_distance=self.distance
+                config.NUM_POSITIONS
             )
             
             # 11. Visualiser la trajectoire complète
@@ -344,7 +346,7 @@ def parse_arguments():
     parser.add_argument('--simulate', action='store_true', help='Mode simulation (sans contrôle robot)')
     parser.add_argument('--auto_photo', action='store_true', help='Prendre automatiquement des photos à chaque cible')
     parser.add_argument('--louvain_coeff', type=float, default=0.5, help='Coefficient pour la détection Louvain (défaut: 0.5)')
-    parser.add_argument('--distance', type=float, default=0.1, help='Distance aux feuilles cibles en mètres (défaut: 0.1 m)')
+    parser.add_argument('--distance', type=float, default=0.04, help='Distance aux feuilles cibles en mètres (défaut: 0.4 m)')
     
     return parser.parse_args()
 

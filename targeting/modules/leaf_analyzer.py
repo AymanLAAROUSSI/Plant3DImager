@@ -311,7 +311,7 @@ def calculate_target_point(leaf_data, distance=0.10):
     
     return target_point.tolist()
 
-def extract_leaf_data_from_communities(communities, points, min_inlier_ratio=0.7):
+def extract_leaf_data_from_communities(communities, points, min_inlier_ratio=0.7, distance=0.1):
     """
     Extrait les données des feuilles à partir des communautés détectées
     
@@ -319,6 +319,7 @@ def extract_leaf_data_from_communities(communities, points, min_inlier_ratio=0.7
         communities: Liste des communautés (ensemble d'indices)
         points: Nuage de points complet
         min_inlier_ratio: Ratio minimum d'inliers pour considérer une surface comme valide
+        distance: Distance aux feuilles en mètres pour le calcul des points cibles
     
     Returns:
         Liste des données de feuilles au format standardisé
@@ -329,6 +330,8 @@ def extract_leaf_data_from_communities(communities, points, min_inlier_ratio=0.7
     plant_center = np.mean(points, axis=0)
     # Utiliser une hauteur minimale pour le centre (base de la plante)
     plant_center[2] = np.min(points[:, 2])
+    
+    print(f"\nUtilisation d'une distance de {distance*100:.1f} cm pour calculer les points cibles")
     
     for i, community in enumerate(communities):
         # Extraire les points de cette communauté
@@ -358,8 +361,8 @@ def extract_leaf_data_from_communities(communities, points, min_inlier_ratio=0.7
             plane_info['equation'] = [-a, -b, -c, -d]
             print(f"Communauté {i+1}: Normale réorientée vers l'extérieur")
         
-        # Calculer le point cible à 10 cm de la feuille
-        target_point = calculate_target_point(plane_info, distance=0.10)
+        # Calculer le point cible à la distance spécifiée de la feuille
+        target_point = calculate_target_point(plane_info, distance=distance)
         
         # Créer l'entrée pour cette feuille
         leaf_data = {
