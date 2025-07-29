@@ -237,23 +237,26 @@ class CircleAcquisition:
             self.metadata_generator.create_images_json(workspace)
             
             # Extraire les noms de fichiers (sans le chemin complet)
+            # Même si self.photos_taken est vide, on génère quand même les fichiers
+            photo_filenames = []
             if self.photos_taken:
                 photo_filenames = [os.path.basename(path) for path in self.photos_taken]
-                
-                # Générer files.json
-                self.metadata_generator.create_files_json(photo_filenames)
-                
-                # Générer scan.toml
-                self.metadata_generator.create_scan_toml(
-                    self.num_positions, self.num_circles, self.circle_radius, self.z_offset
-                )
-                
-                print(f"\nMétadonnées générées:")
-                print(f"- images.json: {os.path.join(self.session_dirs['metadata'], 'images.json')}")
-                print(f"- files.json: {os.path.join(self.session_dirs['main'], 'files.json')}")
-                print(f"- scan.toml: {os.path.join(self.session_dirs['main'], 'scan.toml')}")
-            else:
-                print("AVERTISSEMENT: Aucune photo prise, les fichiers files.json et scan.toml n'ont pas été générés")
+            
+            # Générer files.json (même si photo_filenames est vide)
+            self.metadata_generator.create_files_json(photo_filenames)
+            
+            # Générer scan.toml (indépendamment des photos)
+            self.metadata_generator.create_scan_toml(
+                self.num_positions, self.num_circles, self.circle_radius, self.z_offset
+            )
+            
+            print(f"\nMétadonnées générées:")
+            print(f"- images.json: {os.path.join(self.session_dirs['metadata'], 'images.json')}")
+            print(f"- files.json: {os.path.join(self.session_dirs['main'], 'files.json')}")
+            print(f"- scan.toml: {os.path.join(self.session_dirs['main'], 'scan.toml')}")
+            
+            if not self.photos_taken:
+                print("Note: files.json généré sans photos car aucune photo n'a été prise")
             
             print("\nAcquisition d'images terminée!")
             print(f"Nombre total de photos prises: {len(self.photos_taken)}/{self.num_positions*self.num_circles}")
