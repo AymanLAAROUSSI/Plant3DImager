@@ -36,3 +36,12 @@ STABILIZATION_TIME = 3.0
 RESULTS_DIR = "results"  # Nouveau répertoire parent pour tous les résultats
 ACQUISITION_DIR = "plant_acquisition"  # Renommé de aa_photos_reconstructions
 TARGETING_DIR = "leaf_targeting"  # Inchangé mais plus cohérent
+
+# Configuration de la synchronisation
+SSH_HOST = "10.0.7.22"
+SSH_USER = "ayman"
+KEY_PATH = "/home/romi/.ssh/id_rsa"
+REMOTE_WORK_PATH = "/mnt/diskSustainability/Scanner_Data/scanner_lyon/3dt_colA/Col_A_2021-01-29/"
+LOCAL_ACQUISITION_BASE = "results/plant_acquisition"  # Relatif au répertoire du projet
+LOCAL_PLY_TARGET = "results/pointclouds"  # Relatif au répertoire du projet
+ROMI_CONFIG = "~/plant-3d-vision/configs/geom_pipe_real.toml"
