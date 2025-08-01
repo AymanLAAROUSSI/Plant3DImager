@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Script principal pour le système de ciblage de feuilles (adapté pour l'architecture modulaire)
+Main script for leaf targeting system (adapted for modular architecture)
 """
 
 import os
@@ -11,14 +11,14 @@ import argparse
 import numpy as np
 import time
 
-# Importations des modules de la nouvelle architecture
+# Imports from new architecture
 from core.hardware.cnc_controller import CNCController
 from core.hardware.camera_controller import CameraController
 from core.hardware.gimbal_controller import GimbalController
 from core.data.storage_manager import StorageManager
 from core.utils import config
 
-# Importations des modules spécifiques au ciblage
+# Imports from targeting-specific modules
 from targeting.modules.data_manager import load_and_scale_pointcloud, compute_cropped_alpha_shape, save_leaves_data
 from targeting.modules.leaf_analyzer import calculate_adaptive_radius, build_connectivity_graph
 from targeting.modules.leaf_analyzer import detect_communities_louvain_multiple, extract_leaf_data_from_communities
@@ -28,16 +28,16 @@ from targeting.modules.robot_controller import RobotController
 from targeting.modules.visualization import visualize_path, visualize_complete_path
 
 class LeafTargeting:
-    """Classe principale pour le système de ciblage de feuilles"""
+    """Main class for leaf targeting system"""
     
     def __init__(self, args=None):
         """
-        Initialise le système de ciblage de feuilles
+        Initialize the leaf targeting system
         
         Args:
-            args: Arguments de la ligne de commande (optionnel)
+            args: Command line arguments (optional)
         """
-        # Paramètres par défaut
+        # Default parameters
         self.point_cloud_path = None
         self.scale = 0.001
         self.alpha = 0.1
@@ -48,23 +48,23 @@ class LeafTargeting:
         self.simulate = False
         self.auto_photo = False
         self.louvain_coeff = 0.5
-        self.distance = 0.4  # Distance par défaut aux feuilles cibles modifiée à 40 cm
+        self.distance = 0.4  # Default distance to target leaves changed to 40 cm
         
-        # Mettre à jour les paramètres avec les arguments de la ligne de commande
+        # Update parameters with command line arguments
         if args:
             self.update_from_args(args)
         
-        # Contrôleurs matériels
+        # Hardware controllers
         self.cnc = None
         self.camera = None
         self.gimbal = None
         self.robot = None
         
-        # Gestionnaire de stockage
+        # Storage manager
         self.storage = None
         self.session_dirs = None
         
-        # Données
+        # Data
         self.pcd = None
         self.points = None
         self.alpha_pcd = None
@@ -72,11 +72,11 @@ class LeafTargeting:
         self.leaves_data = []
         self.selected_leaves = []
         
-        # État
+        # State
         self.initialized = False
     
     def update_from_args(self, args):
-        """Met à jour les paramètres depuis les arguments de la ligne de commande"""
+        """Update parameters from command line arguments"""
         if hasattr(args, 'point_cloud') and args.point_cloud is not None:
             self.point_cloud_path = args.point_cloud
         
@@ -111,31 +111,31 @@ class LeafTargeting:
             self.distance = args.distance
     
     def initialize(self):
-        """Initialise les composants et les répertoires"""
+        """Initialize components and directories"""
         if self.initialized:
             return True
         
         try:
-            print("\n=== Initialisation du système de ciblage de feuilles ===")
+            print("\n=== Initializing leaf targeting system ===")
             
-            # Vérifier le chemin du nuage de points
+            # Check point cloud path
             if not self.point_cloud_path:
-                print("ERREUR: Chemin du nuage de points non spécifié")
+                print("ERROR: Point cloud path not specified")
                 return False
             
             if not os.path.exists(self.point_cloud_path):
-                print(f"ERREUR: Le fichier {self.point_cloud_path} n'existe pas")
+                print(f"ERROR: File {self.point_cloud_path} does not exist")
                 return False
             
-            # Créer le gestionnaire de stockage
+            # Create storage manager
             self.storage = StorageManager(mode="targeting")
             self.session_dirs = self.storage.create_directory_structure()
             
-            print("\nRépertoires créés:")
+            print("\nDirectories created:")
             for key, path in self.session_dirs.items():
                 print(f"- {key}: {path}")
             
-            # Initialiser les contrôleurs matériels (uniquement si pas en mode simulation)
+            # Initialize hardware controllers (only if not in simulation mode)
             if not self.simulate:
                 self.cnc = CNCController(config.CNC_SPEED)
                 self.cnc.connect()
@@ -147,7 +147,7 @@ class LeafTargeting:
                 self.gimbal = GimbalController(self.arduino_port)
                 self.gimbal.connect()
                 
-                # Initialiser le contrôleur robot
+                # Initialize robot controller
                 self.robot = RobotController(
                     cnc=self.cnc,
                     camera=self.camera,
@@ -155,102 +155,102 @@ class LeafTargeting:
                     output_dirs=self.session_dirs
                 )
             
-            # Afficher les paramètres
-            print(f"\nParamètres de ciblage:")
-            print(f"- Nuage de points: {self.point_cloud_path}")
-            print(f"- Facteur d'échelle: {self.scale}")
-            print(f"- Valeur alpha: {self.alpha}")
-            print(f"- Méthode de cropping: {self.crop_method}")
-            print(f"- Distance aux feuilles: {self.distance} m")
-            print(f"- Mode simulation: {'Activé' if self.simulate else 'Désactivé'}")
+            # Display parameters
+            print(f"\nTargeting parameters:")
+            print(f"- Point cloud: {self.point_cloud_path}")
+            print(f"- Scale factor: {self.scale}")
+            print(f"- Alpha value: {self.alpha}")
+            print(f"- Cropping method: {self.crop_method}")
+            print(f"- Distance to leaves: {self.distance} m")
+            print(f"- Simulation mode: {'Enabled' if self.simulate else 'Disabled'}")
             
             self.initialized = True
             return True
             
         except Exception as e:
-            print(f"Erreur d'initialisation: {e}")
+            print(f"Initialization error: {e}")
             self.shutdown()
             return False
     
     def run_targeting(self):
-        """Exécute le processus de ciblage complet"""
+        """Execute the complete targeting process"""
         if not self.initialize():
             return False
         
         try:
-            # 1. Charger le nuage de points
-            print("\n=== 1. Chargement du nuage de points ===")
+            # 1. Load point cloud
+            print("\n=== 1. Loading point cloud ===")
             self.pcd, self.points = load_and_scale_pointcloud(self.point_cloud_path, self.scale)
             
-            # 2. Calculer l'Alpha Shape pour extraire les surfaces
-            print("\n=== 2. Calcul de l'Alpha Shape ===")
+            # 2. Calculate Alpha Shape to extract surfaces
+            print("\n=== 2. Computing Alpha Shape ===")
             self.alpha_pcd, self.alpha_points = compute_cropped_alpha_shape(
                 self.pcd, self.points, self.alpha, self.crop_method, self.crop_percentage, 
                 self.z_offset, self.session_dirs["analysis"]
             )
             
-            # 3. Calculer le rayon de connectivité
-            print("\n=== 3. Calcul du rayon de connectivité ===")
+            # 3. Calculate connectivity radius
+            print("\n=== 3. Computing connectivity radius ===")
             radius = calculate_adaptive_radius(self.alpha_points)
             
-            # 4. Coefficient Louvain fourni par l'utilisateur
-            print(f"\n=== 4. Coefficient Louvain: {self.louvain_coeff} ===")
+            # 4. Louvain coefficient provided by user
+            print(f"\n=== 4. Louvain Coefficient: {self.louvain_coeff} ===")
             coeff = self.louvain_coeff
             
-            # 5. Construire le graphe de connectivité
-            print("\n=== 5. Construction du graphe de connectivité ===")
+            # 5. Build connectivity graph
+            print("\n=== 5. Building connectivity graph ===")
             graph = build_connectivity_graph(self.alpha_points, radius)
             
-            # 6. Déterminer la taille minimale des communautés
+            # 6. Determine minimum community size
             min_size = max(10, len(self.alpha_points) // 30)
-            print(f"\n=== 6. Taille minimale des communautés: {min_size} points ===")
+            print(f"\n=== 6. Minimum community size: {min_size} points ===")
             
-            # 7. Détecter les communautés avec Louvain
-            print("\n=== 7. Détection des communautés ===")
+            # 7. Detect communities with Louvain
+            print("\n=== 7. Detecting communities ===")
             communities = detect_communities_louvain_multiple(graph, coeff, min_size, n_iterations=5)
             
-            # 8. Extraire les données des feuilles
-            print("\n=== 8. Extraction des données des feuilles ===")
+            # 8. Extract leaf data
+            print("\n=== 8. Extracting leaf data ===")
             self.leaves_data = extract_leaf_data_from_communities(
                 communities, self.alpha_points, distance=self.distance
             )
             
-            # Sauvegarder les données
+            # Save data
             leaves_json = os.path.join(self.session_dirs["analysis"], "leaves_data.json")
             save_leaves_data(self.leaves_data, leaves_json)
             
-            # 9. Sélection interactive des feuilles
-            print("\n=== 9. Sélection interactive des feuilles ===")
+            # 9. Interactive leaf selection
+            print("\n=== 9. Interactive leaf selection ===")
             self.selected_leaves = select_leaf_with_matplotlib(
                 self.leaves_data, self.points, self.session_dirs["visualizations"]
             )
             
             if not self.selected_leaves:
-                print("Aucune feuille sélectionnée. Fin du programme.")
+                print("No leaves selected. Ending program.")
                 return True
             
-            # 10. Planifier la trajectoire complète
-            print("\n=== 10. Planification de la trajectoire complète ===")
-            current_position = [0, 0, 0]  # Position actuelle (à remplacer par la position réelle du robot)
+            # 10. Plan complete trajectory
+            print("\n=== 10. Planning complete trajectory ===")
+            current_position = [0, 0, 0]  # Current position (replace with actual robot position)
             
-            # Si en mode non-simulation, obtenir la position réelle
+            # If not in simulation mode, get actual position
             if not self.simulate and self.cnc:
                 pos = self.cnc.get_position()
                 current_position = [pos['x'], pos['y'], pos['z']]
             
-            # Extraire les points cibles
+            # Extract target points
             target_points = [leaf["target_point"] for leaf in self.selected_leaves]
             
-            # Planifier la trajectoire complète - la distance est déjà prise en compte dans les target_points
+            # Plan complete trajectory - distance is already accounted for in target_points
             complete_path = plan_complete_path(
                 current_position, target_points, config.CENTER_POINT, config.CIRCLE_RADIUS, 
                 config.NUM_POSITIONS
             )
             
-            # 11. Visualiser la trajectoire complète
-            print("\n=== 11. Visualisation de la trajectoire complète ===")
+            # 11. Visualize complete trajectory
+            print("\n=== 11. Visualizing complete trajectory ===")
             
-            # Préparer les données des feuilles sélectionnées pour la visualisation
+            # Prepare selected leaf data for visualization
             leaf_points_list = []
             leaf_normals_list = []
             
@@ -265,25 +265,25 @@ class LeafTargeting:
                 else:
                     leaf_normals_list.append(np.array([0, 0, 1]))
             
-            # Visualiser la trajectoire complète
+            # Visualize complete trajectory
             visualize_complete_path(
                 complete_path, self.points, leaf_points_list, leaf_normals_list, 
                 self.session_dirs["visualizations"]
             )
             
-            # En mode simulation, s'arrêter ici
+            # In simulation mode, stop here
             if self.simulate:
-                print("\nMode simulation: Fin du programme.")
+                print("\nSimulation mode: Program complete.")
                 return True
             
-            # 12. Exécuter la trajectoire
-            print("\n=== 12. Exécution de la trajectoire ===")
+            # 12. Execute trajectory
+            print("\n=== 12. Executing trajectory ===")
             
-            # Récupérer les centroïdes des feuilles et leurs IDs
+            # Get leaf centroids and IDs
             leaf_centroids = [leaf['centroid'] for leaf in self.selected_leaves]
             leaf_ids = [leaf['id'] for leaf in self.selected_leaves]
             
-            # Exécuter la trajectoire complète
+            # Execute complete trajectory
             success = self.robot.execute_path(
                 complete_path,
                 leaf_centroids=leaf_centroids,
@@ -293,17 +293,17 @@ class LeafTargeting:
             )
             
             if success:
-                print("\nTrajectoire terminée avec succès.")
+                print("\nTrajectory completed successfully.")
             else:
-                print("\nErreur lors de l'exécution de la trajectoire.")
+                print("\nError during trajectory execution.")
             
             return success
             
         except KeyboardInterrupt:
-            print("\nProgramme interrompu par l'utilisateur.")
+            print("\nProgram interrupted by user.")
             return False
         except Exception as e:
-            print(f"\nUne erreur est survenue: {e}")
+            print(f"\nAn error occurred: {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -311,10 +311,10 @@ class LeafTargeting:
             self.shutdown()
     
     def shutdown(self):
-        """Arrête proprement le système"""
-        print("\nArrêt du système de ciblage...")
+        """Properly shut down the system"""
+        print("\nShutting down targeting system...")
         
-        # Arrêter les contrôleurs dans l'ordre inverse d'initialisation
+        # Stop controllers in reverse order of initialization
         if hasattr(self, 'robot') and self.robot and not self.simulate:
             self.robot.shutdown()
         elif not self.simulate:
@@ -328,30 +328,30 @@ class LeafTargeting:
                 self.cnc.shutdown()
         
         self.initialized = False
-        print("Système de ciblage arrêté.")
+        print("Targeting system shut down.")
 
 
 def parse_arguments():
-    """Parse les arguments de la ligne de commande"""
-    parser = argparse.ArgumentParser(description='Système de ciblage de feuilles')
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(description='Leaf targeting system')
     
-    parser.add_argument('point_cloud', help='Fichier de nuage de points (PLY/PCD)')
-    parser.add_argument('--scale', type=float, default=0.001, help='Facteur d\'échelle pour le nuage de points (défaut: 0.001 = mm->m)')
-    parser.add_argument('--alpha', type=float, default=0.1, help='Valeur alpha pour Alpha Shape (défaut: 0.1)')
+    parser.add_argument('point_cloud', help='Point cloud file (PLY/PCD)')
+    parser.add_argument('--scale', type=float, default=0.001, help='Scale factor for point cloud (default: 0.001 = mm->m)')
+    parser.add_argument('--alpha', type=float, default=0.1, help='Alpha value for Alpha Shape (default: 0.1)')
     parser.add_argument('--crop_method', choices=['none', 'top_percentage', 'single_furthest'], 
-                      default='none', help='Méthode de cropping (défaut: none)')
-    parser.add_argument('--crop_percentage', type=float, default=0.25, help='Pourcentage pour top_percentage (défaut: 0.25)')
-    parser.add_argument('--z_offset', type=float, default=0.0, help='Décalage Z pour le cropping (défaut: 0.0)')
-    parser.add_argument('--arduino_port', default=config.ARDUINO_PORT, help=f'Port série Arduino (défaut: {config.ARDUINO_PORT})')
-    parser.add_argument('--simulate', action='store_true', help='Mode simulation (sans contrôle robot)')
-    parser.add_argument('--auto_photo', action='store_true', help='Prendre automatiquement des photos à chaque cible')
-    parser.add_argument('--louvain_coeff', type=float, default=0.5, help='Coefficient pour la détection Louvain (défaut: 0.5)')
-    parser.add_argument('--distance', type=float, default=0.04, help='Distance aux feuilles cibles en mètres (défaut: 0.4 m)')
+                      default='none', help='Cropping method (default: none)')
+    parser.add_argument('--crop_percentage', type=float, default=0.25, help='Percentage for top_percentage (default: 0.25)')
+    parser.add_argument('--z_offset', type=float, default=0.0, help='Z offset for cropping (default: 0.0)')
+    parser.add_argument('--arduino_port', default=config.ARDUINO_PORT, help=f'Arduino serial port (default: {config.ARDUINO_PORT})')
+    parser.add_argument('--simulate', action='store_true', help='Simulation mode (no robot control)')
+    parser.add_argument('--auto_photo', action='store_true', help='Take photos automatically at each target')
+    parser.add_argument('--louvain_coeff', type=float, default=0.5, help='Coefficient for Louvain detection (default: 0.5)')
+    parser.add_argument('--distance', type=float, default=0.04, help='Distance to target leaves in meters (default: 0.4 m)')
     
     return parser.parse_args()
 
 def main():
-    """Fonction principale compatible avec l'implémentation originale"""
+    """Main function compatible with original implementation"""
     args = parse_arguments()
     targeting = LeafTargeting(args)
     success = targeting.run_targeting()

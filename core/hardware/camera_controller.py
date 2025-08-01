@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Contrôleur de caméra unifié pour les modules d'acquisition et de ciblage
+Unified camera controller for acquisition and targeting modules
 """
 
 import os
@@ -12,66 +12,66 @@ from romi.camera import Camera
 
 class CameraController:
     def __init__(self):
-        """Initialise le contrôleur de caméra"""
+        """Initialize the camera controller"""
         self.camera = None
         self.photos_dir = None
         self.initialized = False
     
     def connect(self):
-        """Connecte à la caméra et l'initialise"""
+        """Connect to the camera and initialize it"""
         if self.initialized:
             return self
         
         try:
-            print("Initialisation de la caméra...")
+            print("Initializing camera...")
             self.camera = Camera("camera", "camera")
             self.initialized = True
             return self
         except Exception as e:
-            print(f"Erreur lors de l'initialisation de la caméra: {e}")
+            print(f"Error initializing camera: {e}")
             raise
     
     def set_output_directory(self, directory):
-        """Définit le répertoire de sortie pour les photos"""
+        """Set the output directory for photos"""
         self.photos_dir = directory
         os.makedirs(directory, exist_ok=True)
-        print(f"Répertoire de sortie des photos: {directory}")
+        print(f"Photos output directory: {directory}")
     
     def take_photo(self, filename=None, metadata=None):
-        """Prend une photo avec la caméra"""
+        """Take a photo with the camera"""
         if not self.initialized:
-            raise RuntimeError("Caméra non initialisée")
+            raise RuntimeError("Camera not initialized")
         
         try:
-            print("Capture d'image en cours...")
+            print("Capturing image...")
             image = self.camera.grab()
             
             if image is not None:
-                # Générer un nom de fichier s'il n'est pas spécifié
+                # Generate a filename if not specified
                 if filename is None:
                     timestamp = time.strftime("%Y%m%d-%H%M%S")
                     filename = f"photo_{timestamp}.jpg"
                 
-                # Ajouter le chemin complet
+                # Add the full path
                 if self.photos_dir:
                     filepath = os.path.join(self.photos_dir, filename)
                 else:
                     filepath = filename
                 
-                # Sauvegarder l'image
+                # Save the image
                 image.save(filepath)
-                print(f"Image sauvegardée: {filepath}")
+                print(f"Image saved: {filepath}")
                 return filepath, metadata
             else:
-                print("Erreur: Impossible de capturer l'image")
+                print("Error: Unable to capture image")
                 return None, None
                 
         except Exception as e:
-            print(f"Erreur lors de la prise de photo: {e}")
+            print(f"Error taking photo: {e}")
             return None, None
     
     def shutdown(self):
-        """Arrête proprement la caméra"""
+        """Properly shut down the camera"""
         if not self.initialized:
             return True
             

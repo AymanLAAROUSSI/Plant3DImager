@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Module d'acquisition d'images en cercle intégré dans l'architecture modulaire
+Circular image acquisition module integrated into the modular architecture
 """
 
 import time
@@ -19,12 +19,12 @@ from core.utils import config
 class CircleAcquisition:
     def __init__(self, args=None):
         """
-        Initialise le module d'acquisition en cercle
+        Initialize the circular acquisition module
         
         Args:
-            args: Arguments de la ligne de commande (optionnel)
+            args: Command line arguments (optional)
         """
-        # Paramètres par défaut
+        # Default parameters
         self.num_circles = 1
         self.num_positions = config.NUM_POSITIONS
         self.circle_radius = config.CIRCLE_RADIUS
@@ -34,29 +34,29 @@ class CircleAcquisition:
         self.update_interval = config.UPDATE_INTERVAL
         self.target_point = config.TARGET_POINT
         
-        # Mettre à jour les paramètres avec les arguments de la ligne de commande
+        # Update parameters with command line arguments
         if args:
             self.update_from_args(args)
         
-        # Contrôleurs matériels
+        # Hardware controllers
         self.cnc = None
         self.camera = None
         self.gimbal = None
         
-        # Gestionnaire de stockage
+        # Storage manager
         self.storage = None
         self.metadata_generator = None
         
-        # Données de session
+        # Session data
         self.photos_taken = []
         self.metadata_files = []
         self.session_dirs = None
         
-        # État
+        # State
         self.initialized = False
     
     def update_from_args(self, args):
-        """Met à jour les paramètres depuis les arguments de la ligne de commande"""
+        """Update parameters from command line arguments"""
         if hasattr(args, 'circles') and args.circles is not None:
             self.num_circles = args.circles
         
@@ -76,26 +76,26 @@ class CircleAcquisition:
             self.cnc_speed = args.speed
     
     def initialize(self):
-        """Initialise les composants matériels et les répertoires"""
+        """Initialize hardware components and directories"""
         if self.initialized:
             return True
         
         try:
-            print("\n=== Initialisation du système d'acquisition en cercle ===")
+            print("\n=== Initializing circular acquisition system ===")
             
-            # Créer le gestionnaire de stockage
+            # Create storage manager
             self.storage = StorageManager(mode="acquisition")
             self.session_dirs = self.storage.create_directory_structure()
             
-            # Afficher les répertoires pour débogage
-            print("\nRépertoires créés:")
+            # Display directories for debugging
+            print("\nCreated directories:")
             for key, path in self.session_dirs.items():
                 print(f"- {key}: {path}")
             
-            # Créer le générateur de métadonnées
+            # Create metadata generator
             self.metadata_generator = MetadataGenerator(self.storage)
             
-            # Initialiser les contrôleurs matériels
+            # Initialize hardware controllers
             self.cnc = CNCController(self.cnc_speed)
             self.cnc.connect()
             
@@ -106,36 +106,36 @@ class CircleAcquisition:
             self.gimbal = GimbalController(self.arduino_port)
             self.gimbal.connect()
             
-            # Afficher les paramètres
-            print(f"\nParamètres d'acquisition:")
-            print(f"- Point cible: {self.target_point}")
-            print(f"- Centre du cercle: {config.CENTER_POINT}")
-            print(f"- Rayon: {self.circle_radius} m")
-            print(f"- Nombre de cercles: {self.num_circles}")
-            print(f"- Positions par cercle: {self.num_positions}")
-            print(f"- Nombre total de photos: {self.num_positions * self.num_circles}")
+            # Display parameters
+            print(f"\nAcquisition parameters:")
+            print(f"- Target point: {self.target_point}")
+            print(f"- Circle center: {config.CENTER_POINT}")
+            print(f"- Radius: {self.circle_radius} m")
+            print(f"- Number of circles: {self.num_circles}")
+            print(f"- Positions per circle: {self.num_positions}")
+            print(f"- Total number of photos: {self.num_positions * self.num_circles}")
             if self.num_circles > 1:
-                print(f"- Décalage en Z: {self.z_offset} m")
+                print(f"- Z offset: {self.z_offset} m")
             
             self.initialized = True
             return True
             
         except Exception as e:
-            print(f"Erreur d'initialisation: {e}")
+            print(f"Initialization error: {e}")
             self.shutdown()
             return False
     
     def run_acquisition(self):
-        """Exécute le processus d'acquisition complet"""
+        """Execute the complete acquisition process"""
         if not self.initialize():
             return False
         
         try:
-            # Position initiale pour le calcul du chemin
+            # Initial position for path calculation
             current_pos = self.cnc.get_position()
             start_point = (current_pos['x'], current_pos['y'], current_pos['z'])
             
-            # Planifier le chemin sur le(s) cercle(s)
+            # Plan path on circle(s)
             path = plan_multi_circle_path(
                 center=config.CENTER_POINT,
                 radius=self.circle_radius,
@@ -145,19 +145,19 @@ class CircleAcquisition:
                 start_point=start_point
             )
             
-            print(f"\nChemin planifié: {len(path)} points")
+            print(f"\nPlanned path: {len(path)} points")
             
-            # Demander confirmation
-            input("\nAppuyez sur Entrée pour commencer l'acquisition d'images...")
+            # Ask for confirmation
+            input("\nPress Enter to start image acquisition...")
             
-            # Orientation initiale de la caméra vers le point cible
-            print("\nOrientation initiale de la caméra vers le point cible...")
+            # Initial camera orientation toward target point
+            print("\nInitial camera orientation toward target point...")
             self.gimbal.aim_at_target(current_pos, self.target_point)
             
-            # Variables pour suivre la position de la caméra
+            # Variables to track camera position
             photo_index = 0
             
-            # Parcourir le chemin
+            # Follow the path
             for i, point_info in enumerate(path):
                 position = point_info["position"]
                 point_type = point_info["type"]
@@ -167,29 +167,29 @@ class CircleAcquisition:
                 if comment:
                     print(f"Info: {comment}")
                 
-                # Déplacement vers la position
+                # Move to position
                 success = self.cnc.move_to(
                     position[0], position[1], position[2], wait=True
                 )
                 
                 if not success:
-                    print(f"Erreur lors du déplacement au point {i+1}")
+                    print(f"Error during movement to point {i+1}")
                     continue
                 
-                # Si c'est un point de passage sur le cercle (où on prend une photo)
+                # If this is a via point on the circle (where we take a photo)
                 if point_type == "via_point" and "Position" in comment:
-                    # Obtenir la position finale
+                    # Get final position
                     final_pos = self.cnc.get_position()
                     
-                    # Orientation finale de la caméra
-                    print("Ajustement final de la caméra...")
+                    # Final camera orientation
+                    print("Final camera adjustment...")
                     self.gimbal.aim_at_target(final_pos, self.target_point, wait=True)
                     
-                    # Pause pour stabilisation
-                    print(f"Stabilisation pendant {config.STABILIZATION_TIME} secondes...")
+                    # Pause for stabilization
+                    print(f"Stabilizing for {config.STABILIZATION_TIME} seconds...")
                     time.sleep(config.STABILIZATION_TIME)
                     
-                    # Créer un dictionnaire avec les informations de pose de la caméra
+                    # Create dictionary with camera pose information
                     camera_pose = {
                         'x': final_pos['x'],
                         'y': final_pos['y'],
@@ -198,37 +198,37 @@ class CircleAcquisition:
                         'tilt_angle': self.gimbal.current_tilt
                     }
                     
-                    # Prendre une photo
-                    print(f"Prise de photo {photo_index+1}...")
+                    # Take a photo
+                    print(f"Taking photo {photo_index+1}...")
                     image_id = f"{photo_index:05d}_rgb"
                     filename = f"{image_id}.jpg"
                     
                     photo_path, _ = self.camera.take_photo(filename, camera_pose)
                     
                     if photo_path:
-                        # Générer les métadonnées
+                        # Generate metadata
                         json_path = self.metadata_generator.create_image_metadata(
                             image_id, camera_pose, self.session_dirs["metadata_images"]
                         )
                         
-                        # Ajouter aux listes
+                        # Add to lists
                         self.photos_taken.append(photo_path)
                         self.metadata_files.append(json_path)
                         
-                        print(f"Photo {photo_index+1} prise avec succès")
+                        print(f"Photo {photo_index+1} taken successfully")
                         photo_index += 1
                     else:
-                        print(f"Échec de la prise de photo à la position {i+1}")
+                        print(f"Failed to take photo at position {i+1}")
             
-            # Génération des fichiers de métadonnées finaux
-            print("\nGénération des fichiers de métadonnées...")
+            # Generate final metadata files
+            print("\nGenerating metadata files...")
             
-            # Vérifier que les répertoires existent
+            # Check that directories exist
             if not self.session_dirs:
-                print("ERREUR: Les répertoires de session n'ont pas été créés")
+                print("ERROR: Session directories were not created")
                 return False
             
-            # Générer workspace.json
+            # Generate workspace.json
             workspace = {
                 "x": [225, 525],
                 "y": [220, 520],
@@ -236,49 +236,49 @@ class CircleAcquisition:
             }
             self.metadata_generator.create_images_json(workspace)
             
-            # Extraire les noms de fichiers (sans le chemin complet)
-            # Même si self.photos_taken est vide, on génère quand même les fichiers
+            # Extract filenames (without full path)
+            # Even if self.photos_taken is empty, still generate files
             photo_filenames = []
             if self.photos_taken:
                 photo_filenames = [os.path.basename(path) for path in self.photos_taken]
             
-            # Générer files.json (même si photo_filenames est vide)
+            # Generate files.json (even if photo_filenames is empty)
             self.metadata_generator.create_files_json(photo_filenames)
             
-            # Générer scan.toml (indépendamment des photos)
+            # Generate scan.toml (independent of photos)
             self.metadata_generator.create_scan_toml(
                 self.num_positions, self.num_circles, self.circle_radius, self.z_offset
             )
             
-            print(f"\nMétadonnées générées:")
+            print(f"\nMetadata generated:")
             print(f"- images.json: {os.path.join(self.session_dirs['metadata'], 'images.json')}")
             print(f"- files.json: {os.path.join(self.session_dirs['main'], 'files.json')}")
             print(f"- scan.toml: {os.path.join(self.session_dirs['main'], 'scan.toml')}")
             
             if not self.photos_taken:
-                print("Note: files.json généré sans photos car aucune photo n'a été prise")
+                print("Note: files.json generated without photos as no photos were taken")
             
-            print("\nAcquisition d'images terminée!")
-            print(f"Nombre total de photos prises: {len(self.photos_taken)}/{self.num_positions*self.num_circles}")
-            print(f"Photos sauvegardées dans: {self.session_dirs['images']}")
-            print(f"Métadonnées sauvegardées dans: {self.session_dirs['metadata_images']}")
+            print("\nImage acquisition completed!")
+            print(f"Total photos taken: {len(self.photos_taken)}/{self.num_positions*self.num_circles}")
+            print(f"Photos saved in: {self.session_dirs['images']}")
+            print(f"Metadata saved in: {self.session_dirs['metadata_images']}")
             
             return True
             
         except KeyboardInterrupt:
-            print("\nAcquisition interrompue par l'utilisateur")
+            print("\nAcquisition interrupted by user")
             return False
         except Exception as e:
-            print(f"\nUne erreur est survenue: {e}")
+            print(f"\nAn error occurred: {e}")
             return False
         finally:
             self.shutdown()
     
     def shutdown(self):
-        """Arrête proprement le système"""
-        print("\nArrêt du système d'acquisition...")
+        """Properly shut down the system"""
+        print("\nShutting down acquisition system...")
         
-        # Arrêter les contrôleurs dans l'ordre inverse d'initialisation
+        # Stop controllers in reverse order of initialization
         if hasattr(self, 'gimbal') and self.gimbal:
             self.gimbal.shutdown()
         
@@ -289,4 +289,4 @@ class CircleAcquisition:
             self.cnc.shutdown()
         
         self.initialized = False
-        print("Système d'acquisition arrêté.")
+        print("Acquisition system shut down.")

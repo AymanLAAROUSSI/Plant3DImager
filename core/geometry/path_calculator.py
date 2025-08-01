@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Fonctions de calcul de chemins pour les trajectoires circulaires et autres
+Path calculation functions for circular trajectories and others
 """
 
 import math
@@ -12,17 +12,17 @@ from core.utils import config
 
 def calculate_circle_positions(center=None, radius=None, num_positions=None):
     """
-    Calcule les positions sur un cercle dans le plan XY
+    Calculate positions on a circle in the XY plane
     
     Args:
-        center: Tuple (x, y, z) du centre du cercle (défaut: CENTER_POINT)
-        radius: Rayon du cercle (défaut: CIRCLE_RADIUS)
-        num_positions: Nombre de positions sur le cercle (défaut: NUM_POSITIONS)
+        center: Tuple (x, y, z) of circle center (default: CENTER_POINT)
+        radius: Circle radius (default: CIRCLE_RADIUS)
+        num_positions: Number of positions on the circle (default: NUM_POSITIONS)
     
     Returns:
-        Liste de tuples (x, y, z) représentant les positions sur le cercle
+        List of tuples (x, y, z) representing positions on the circle
     """
-    # Utiliser les valeurs par défaut si non spécifiées
+    # Use default values if not specified
     if center is None:
         center = config.CENTER_POINT
     
@@ -34,13 +34,13 @@ def calculate_circle_positions(center=None, radius=None, num_positions=None):
     
     positions = []
     for i in range(num_positions):
-        # Calculer l'angle en radians
+        # Calculate angle in radians
         angle = 2 * math.pi * i / num_positions
         
-        # Calculer les coordonnées x et y
+        # Calculate x and y coordinates
         x = center[0] + radius * math.cos(angle)
         y = center[1] + radius * math.sin(angle)
-        z = center[2]  # Garder la même hauteur
+        z = center[2]  # Keep same height
         
         positions.append((x, y, z))
     
@@ -48,22 +48,22 @@ def calculate_circle_positions(center=None, radius=None, num_positions=None):
 
 def find_closest_point_index(positions, reference_point):
     """
-    Trouve l'index du point le plus proche du point de référence
+    Find the index of the point closest to the reference point
     
     Args:
-        positions: Liste de tuples (x, y, z)
-        reference_point: Point de référence (x, y, z) ou {"x": x, "y": y, "z": z}
+        positions: List of tuples (x, y, z)
+        reference_point: Reference point (x, y, z) or {"x": x, "y": y, "z": z}
     
     Returns:
-        Index du point le plus proche
+        Index of the closest point
     """
-    # Convertir le point de référence si nécessaire
+    # Convert reference point if needed
     if isinstance(reference_point, dict):
         ref_point = (reference_point['x'], reference_point['y'], reference_point['z'])
     else:
         ref_point = reference_point
     
-    # Utiliser KDTree pour une recherche efficace
+    # Use KDTree for efficient search
     tree = cKDTree(positions)
     _, index = tree.query(ref_point)
     
@@ -71,33 +71,33 @@ def find_closest_point_index(positions, reference_point):
 
 def reorder_positions(positions, start_index):
     """
-    Réorganise la liste des positions pour commencer par l'index spécifié
+    Reorder the positions list to start from the specified index
     
     Args:
-        positions: Liste des positions
-        start_index: Index par lequel commencer
+        positions: List of positions
+        start_index: Index to start from
     
     Returns:
-        Liste réordonnée des positions
+        Reordered list of positions
     """
     reordered = positions[start_index:] + positions[:start_index]
     return reordered
 
 def plan_circle_path(center=None, radius=None, num_positions=None, start_point=None):
     """
-    Planifie un chemin circulaire complet, en commençant par le point le plus proche
-    du point de départ spécifié
+    Plan a complete circular path, starting from the point closest
+    to the specified start point
     
     Args:
-        center: Centre du cercle (défaut: CENTER_POINT)
-        radius: Rayon du cercle (défaut: CIRCLE_RADIUS)
-        num_positions: Nombre de positions (défaut: NUM_POSITIONS)
-        start_point: Point de départ (défaut: (0, 0, 0))
+        center: Circle center (default: CENTER_POINT)
+        radius: Circle radius (default: CIRCLE_RADIUS)
+        num_positions: Number of positions (default: NUM_POSITIONS)
+        start_point: Starting point (default: (0, 0, 0))
         
     Returns:
-        Liste de dictionnaires décrivant la trajectoire
+        List of dictionaries describing the trajectory
     """
-    # Utiliser les valeurs par défaut si non spécifiées
+    # Use default values if not specified
     if center is None:
         center = config.CENTER_POINT
     
@@ -110,65 +110,65 @@ def plan_circle_path(center=None, radius=None, num_positions=None, start_point=N
     if start_point is None:
         start_point = (0, 0, 0)
     
-    # Calculer les positions sur le cercle
+    # Calculate positions on the circle
     positions = calculate_circle_positions(center, radius, num_positions)
     
-    # Trouver le point le plus proche du point de départ
+    # Find the point closest to the start point
     closest_index = find_closest_point_index(positions, start_point)
     
-    # Réorganiser les positions pour commencer par le point le plus proche
+    # Reorder positions to start from the closest point
     ordered_positions = reorder_positions(positions, closest_index)
     
-    # Créer la trajectoire
+    # Create trajectory
     path = []
     
-    # Ajouter le point de départ
+    # Add starting point
     path.append({
         "position": start_point,
         "type": "start",
-        "comment": "Position de départ"
+        "comment": "Starting position"
     })
     
-    # Ajouter le point d'entrée sur le cercle
+    # Add entry point on the circle
     path.append({
         "position": ordered_positions[0],
         "type": "via_point",
-        "comment": "Point d'entrée sur le cercle"
+        "comment": "Entry point on the circle"
     })
     
-    # Ajouter les positions sur le cercle
+    # Add positions on the circle
     for i, pos in enumerate(ordered_positions[1:], 1):
         path.append({
             "position": pos,
             "type": "via_point",
-            "comment": f"Position {i}/{num_positions} sur le cercle"
+            "comment": f"Position {i}/{num_positions} on the circle"
         })
     
-    # Ajouter le retour au point de départ
+    # Add return to starting point
     path.append({
         "position": start_point,
         "type": "end",
-        "comment": "Retour à la position de départ"
+        "comment": "Return to starting position"
     })
     
     return path
 
 def plan_multi_circle_path(center=None, radius=None, num_positions=None, num_circles=1, z_offset=None, start_point=None):
     """
-    Planifie un chemin sur plusieurs cercles à des hauteurs différentes
+    Plan a path on multiple circles at different heights
     
     Args:
-        center: Centre du cercle (défaut: CENTER_POINT)
-        radius: Rayon du cercle (défaut: CIRCLE_RADIUS)
-        num_positions: Nombre de positions par cercle (défaut: NUM_POSITIONS)
-        num_circles: Nombre de cercles (défaut: 1)
-        z_offset: Décalage en Z entre les cercles (défaut: Z_OFFSET)
-        start_point: Point de départ (défaut: (0, 0, 0))
+        center: Circle center (default: CENTER_POINT)
+        radius: Circle radius (default: CIRCLE_RADIUS)
+        num_positions: Number of positions per circle (default: NUM_POSITIONS)
+        num_circles: Number of circles (default: 1)
+        z_offset: Z offset between circles (default: Z_OFFSET)
+        start_point: Starting point (default: (0, 0, 0))
         
     Returns:
-        Liste de dictionnaires décrivant la trajectoire
+        List of dictionaries describing the trajectory
     """
-    # Utiliser les valeurs par défaut si non spécifiées
+    # Use default values if not specified
     if center is None:
         center = config.CENTER_POINT
     
@@ -184,53 +184,53 @@ def plan_multi_circle_path(center=None, radius=None, num_positions=None, num_cir
     if start_point is None:
         start_point = (0, 0, 0)
     
-    # Créer la trajectoire
+    # Create trajectory
     path = []
     
-    # Ajouter le point de départ
+    # Add starting point
     path.append({
         "position": start_point,
         "type": "start",
-        "comment": "Position de départ"
+        "comment": "Starting position"
     })
     
-    # Pour chaque cercle
+    # For each circle
     for circle_num in range(num_circles):
-        # Ajuster la hauteur Z pour ce cercle
+        # Adjust Z height for this circle
         circle_center = (center[0], center[1], center[2] + (circle_num * z_offset))
         
-        # Calculer les positions sur le cercle
+        # Calculate positions on the circle
         positions = calculate_circle_positions(circle_center, radius, num_positions)
         
-        # Pour le premier cercle, commencer par le point le plus proche du point de départ
+        # For the first circle, start from the point closest to the start point
         if circle_num == 0:
             closest_index = find_closest_point_index(positions, start_point)
             positions = reorder_positions(positions, closest_index)
         
-        # Ajouter un commentaire pour le début du cercle
+        # Add comment for circle start
         circle_height = circle_center[2]
         path.append({
             "position": positions[0],
             "type": "via_point",
-            "comment": f"Début du cercle {circle_num+1}/{num_circles} à hauteur Z = {circle_height:.3f}"
+            "comment": f"Start of circle {circle_num+1}/{num_circles} at height Z = {circle_height:.3f}"
         })
         
-        # Ajouter les positions sur ce cercle
+        # Add positions on this circle
         for i, pos in enumerate(positions[1:], 1):
-            # Calcul du numéro de photo global
+            # Calculate global photo number
             photo_num = (circle_num * num_positions) + i
             
             path.append({
                 "position": pos,
                 "type": "via_point",
-                "comment": f"Position {photo_num}/{num_positions*num_circles} sur le cercle {circle_num+1}"
+                "comment": f"Position {photo_num}/{num_positions*num_circles} on circle {circle_num+1}"
             })
     
-    # Ajouter le retour au point de départ
+    # Add return to starting point
     path.append({
         "position": start_point,
         "type": "end",
-        "comment": "Retour à la position de départ"
+        "comment": "Return to starting position"
     })
     
     return path

@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 """
-Module de contrôle manuel du robot
-Permet à l'utilisateur d'envoyer des commandes directes au format "x y z pan tilt [photo]"
+Manual robot control module
+Allows the user to send direct commands in "x y z pan tilt [photo]" format
 """
 
 import time
@@ -18,29 +18,29 @@ from core.utils import config
 class ManualController:
     def __init__(self, args=None):
         """
-        Initialise le contrôleur manuel
+        Initialize the manual controller
         
         Args:
-            args: Arguments de la ligne de commande (optionnel)
+            args: Command line arguments (optional)
         """
-        # Paramètres par défaut
+        # Default parameters
         self.arduino_port = config.ARDUINO_PORT
         self.cnc_speed = config.CNC_SPEED
         
-        # Mettre à jour les paramètres avec les arguments de la ligne de commande
+        # Update parameters with command line arguments
         if args:
             self.update_from_args(args)
         
-        # Contrôleurs matériels
+        # Hardware controllers
         self.cnc = None
         self.camera = None
         self.gimbal = None
         
-        # État
+        # State
         self.initialized = False
     
     def update_from_args(self, args):
-        """Met à jour les paramètres depuis les arguments de la ligne de commande"""
+        """Update parameters from command line arguments"""
         if hasattr(args, 'arduino_port') and args.arduino_port is not None:
             self.arduino_port = args.arduino_port
         
@@ -48,18 +48,18 @@ class ManualController:
             self.cnc_speed = args.speed
     
     def initialize(self):
-        """Initialise les composants matériels"""
+        """Initialize hardware components"""
         if self.initialized:
             return True
         
         try:
-            print("\n=== Initialisation du contrôleur manuel ===")
+            print("\n=== Initializing manual controller ===")
             
-            # Créer le répertoire pour les photos manuelles
+            # Create directory for manual photos
             photos_dir = os.path.join(config.RESULTS_DIR, "manual_control")
             os.makedirs(photos_dir, exist_ok=True)
             
-            # Initialiser les contrôleurs matériels
+            # Initialize hardware controllers
             self.cnc = CNCController(self.cnc_speed)
             self.cnc.connect()
             
@@ -70,108 +70,108 @@ class ManualController:
             self.gimbal = GimbalController(self.arduino_port)
             self.gimbal.connect()
             
-            # Afficher les paramètres
-            print(f"\nParamètres de contrôle:")
-            print(f"- Port Arduino: {self.arduino_port}")
-            print(f"- Vitesse CNC: {self.cnc_speed} m/s")
-            print(f"- Dossier photos: {photos_dir}")
-            print(f"- Temps de stabilisation: {config.STABILIZATION_TIME} secondes")
+            # Display parameters
+            print(f"\nControl parameters:")
+            print(f"- Arduino port: {self.arduino_port}")
+            print(f"- CNC speed: {self.cnc_speed} m/s")
+            print(f"- Photos folder: {photos_dir}")
+            print(f"- Stabilization time: {config.STABILIZATION_TIME} seconds")
             
-            # Obtenir et afficher la position initiale
+            # Get and display initial position
             position = self.cnc.get_position()
-            print(f"\nPosition initiale: X={position['x']:.3f}, Y={position['y']:.3f}, Z={position['z']:.3f}")
-            print(f"Angles initiaux: Pan={self.gimbal.current_pan:.3f}°, Tilt={self.gimbal.current_tilt:.3f}°")
+            print(f"\nInitial position: X={position['x']:.3f}, Y={position['y']:.3f}, Z={position['z']:.3f}")
+            print(f"Initial angles: Pan={self.gimbal.current_pan:.3f}°, Tilt={self.gimbal.current_tilt:.3f}°")
             
             self.initialized = True
             return True
             
         except Exception as e:
-            print(f"Erreur d'initialisation: {e}")
+            print(f"Initialization error: {e}")
             self.shutdown()
             return False
     
     def parse_command(self, command):
         """
-        Parse une commande utilisateur
+        Parse a user command
         
         Args:
-            command: Chaîne de commande au format "x y z [pan] [tilt] [photo]" ou "q" pour quitter
+            command: Command string in "x y z [pan] [tilt] [photo]" format or "q" to quit
             
         Returns:
-            Tuple (action, params) où action est "move", "exit" ou "help",
-            et params est un dictionnaire de paramètres ou None
+            Tuple (action, params) where action is "move", "exit" or "help",
+            and params is a parameters dictionary or None
         """
         command = command.strip().lower()
         
-        # Commande de sortie
+        # Exit command
         if command in ('q', 'quit', 'exit'):
             return ("exit", None)
         
-        # Commande d'aide
+        # Help command
         if command in ('h', 'help', '?'):
             return ("help", None)
             
-        # Commande de déplacement
+        # Move command
         parts = command.split()
         
-        # Format attendu: x y z [pan] [tilt] [photo]
+        # Expected format: x y z [pan] [tilt] [photo]
         if len(parts) >= 3:
             try:
                 params = {
                     'x': float(parts[0]),
                     'y': float(parts[1]),
                     'z': float(parts[2]),
-                    'take_photo': False  # Par défaut, pas de photo
+                    'take_photo': False  # Default, no photo
                 }
                 
-                # Angles optionnels
+                # Optional angles
                 if len(parts) >= 4:
                     params['pan'] = float(parts[3])
                 
                 if len(parts) >= 5:
                     params['tilt'] = float(parts[4])
                 
-                # Option photo (1=oui, 0=non)
+                # Photo option (1=yes, 0=no)
                 if len(parts) >= 6:
                     params['take_photo'] = parts[5] == '1'
                 
                 return ("move", params)
             except ValueError:
-                print("Erreur: Format invalide. Utilisez des nombres pour x, y, z, pan, tilt.")
+                print("Error: Invalid format. Use numbers for x, y, z, pan, tilt.")
                 return ("invalid", None)
         
-        # Commande invalide
-        print("Commande non reconnue. Tapez 'help' pour obtenir de l'aide.")
+        # Invalid command
+        print("Command not recognized. Type 'help' for assistance.")
         return ("invalid", None)
     
     def show_help(self):
-        """Affiche l'aide sur les commandes disponibles"""
-        print("\n=== AIDE CONTRÔLE MANUEL ===")
-        print("Commandes disponibles:")
-        print("  x y z [pan] [tilt] [photo]  - Déplace le robot à la position (x,y,z) et oriente la caméra")
-        print("                                 Photo: 1 pour prendre une photo, 0 ou omis pour ne pas en prendre")
-        print("                                 Exemple: '0.3 0.4 0.1 45 20 1'")
-        print("  h, help, ?                  - Affiche cette aide")
-        print("  q, quit, exit               - Quitte le programme")
-        print("\nNote: Toutes les positions sont en mètres, les angles en degrés.")
-        print("      Les paramètres pan, tilt et photo sont optionnels.")
-        print(f"      Un délai de stabilisation de {config.STABILIZATION_TIME} secondes est appliqué avant chaque photo.")
+        """Display help on available commands"""
+        print("\n=== MANUAL CONTROL HELP ===")
+        print("Available commands:")
+        print("  x y z [pan] [tilt] [photo]  - Move robot to position (x,y,z) and orient camera")
+        print("                                 Photo: 1 to take a photo, 0 or omitted for no photo")
+        print("                                 Example: '0.3 0.4 0.1 45 20 1'")
+        print("  h, help, ?                  - Display this help")
+        print("  q, quit, exit               - Quit program")
+        print("\nNote: All positions are in meters, angles in degrees.")
+        print("      Parameters pan, tilt and photo are optional.")
+        print(f"      A stabilization delay of {config.STABILIZATION_TIME} seconds is applied before each photo.")
     
     def take_photo(self):
-        """Prend une photo à la position actuelle"""
+        """Take a photo at current position"""
         if not self.initialized:
-            print("Erreur: Le contrôleur n'est pas initialisé.")
+            print("Error: Controller not initialized.")
             return None
         
         try:
-            # Pause pour stabilisation avant la prise de photo
-            print(f"Stabilisation pendant {config.STABILIZATION_TIME} secondes...")
+            # Pause for stabilization before taking photo
+            print(f"Stabilizing for {config.STABILIZATION_TIME} seconds...")
             time.sleep(config.STABILIZATION_TIME)
             
-            # Obtenir la position actuelle
+            # Get current position
             position = self.cnc.get_position()
             
-            # Créer un dictionnaire avec les informations de pose de la caméra
+            # Create dictionary with camera pose information
             camera_pose = {
                 'x': position['x'],
                 'y': position['y'],
@@ -180,46 +180,46 @@ class ManualController:
                 'tilt_angle': self.gimbal.current_tilt
             }
             
-            # Générer un nom de fichier
+            # Generate filename
             timestamp = time.strftime("%Y%m%d-%H%M%S")
             filename = f"manual_{timestamp}.jpg"
             
-            # Prendre la photo
-            print("Prise de photo en cours...")
+            # Take photo
+            print("Taking photo...")
             photo_path, _ = self.camera.take_photo(filename, camera_pose)
             
             if photo_path:
-                print(f"Photo prise et sauvegardée: {photo_path}")
+                print(f"Photo taken and saved: {photo_path}")
                 return photo_path
             else:
-                print("Erreur: Impossible de prendre la photo.")
+                print("Error: Unable to take photo.")
                 return None
                 
         except Exception as e:
-            print(f"Erreur lors de la prise de photo: {e}")
+            print(f"Error taking photo: {e}")
             return None
     
     def run_manual_control(self):
-        """Exécute le mode de contrôle manuel"""
+        """Execute manual control mode"""
         if not self.initialize():
             return False
         
         try:
-            print("\n=== MODE CONTRÔLE MANUEL ===")
-            print("Entrez des commandes au format 'x y z [pan] [tilt] [photo]' ou 'q' pour quitter.")
-            print("Photo: 1 pour prendre une photo, 0 ou omis pour ne pas en prendre")
-            print("Tapez 'help' pour obtenir de l'aide.")
+            print("\n=== MANUAL CONTROL MODE ===")
+            print("Enter commands in 'x y z [pan] [tilt] [photo]' format or 'q' to quit.")
+            print("Photo: 1 to take a photo, 0 or omitted for no photo")
+            print("Type 'help' for assistance.")
             
             while True:
-                # Obtenir la commande de l'utilisateur
-                command = input("\nCommande > ")
+                # Get command from user
+                command = input("\nCommand > ")
                 
-                # Parser la commande
+                # Parse command
                 action, params = self.parse_command(command)
                 
-                # Exécuter l'action
+                # Execute action
                 if action == "exit":
-                    print("Sortie du mode de contrôle manuel...")
+                    print("Exiting manual control mode...")
                     break
                 
                 elif action == "help":
@@ -227,75 +227,75 @@ class ManualController:
                 
                 elif action == "move":
                     try:
-                        # Déplacement du robot
+                        # Robot movement
                         x, y, z = params['x'], params['y'], params['z']
-                        print(f"Déplacement vers X={x:.3f}, Y={y:.3f}, Z={z:.3f}...")
+                        print(f"Moving to X={x:.3f}, Y={y:.3f}, Z={z:.3f}...")
                         
                         self.cnc.move_to(x, y, z, wait=True)
                         
-                        # Orientation de la caméra si des angles sont spécifiés
+                        # Camera orientation if angles are specified
                         if 'pan' in params or 'tilt' in params:
                             current_pos = self.cnc.get_position()
                             
-                            # Obtenir les angles actuels
+                            # Get current angles
                             current_pan, current_tilt = self.gimbal.current_pan, self.gimbal.current_tilt
                             
-                            # Calculer les deltas
+                            # Calculate deltas
                             delta_pan = params.get('pan', current_pan) - current_pan
                             delta_tilt = params.get('tilt', current_tilt) - current_tilt
                             
-                            print(f"Orientation de la caméra: Pan={params.get('pan', current_pan):.3f}°, Tilt={params.get('tilt', current_tilt):.3f}°...")
+                            print(f"Orienting camera: Pan={params.get('pan', current_pan):.3f}°, Tilt={params.get('tilt', current_tilt):.3f}°...")
                             
-                            # Envoyer la commande à la gimbal
+                            # Send command to gimbal
                             self.gimbal.send_command(delta_pan, delta_tilt, wait_for_goal=True)
                         
-                        # Afficher la position finale
+                        # Display final position
                         position = self.cnc.get_position()
-                        print(f"Position atteinte: X={position['x']:.3f}, Y={position['y']:.3f}, Z={position['z']:.3f}")
+                        print(f"Position reached: X={position['x']:.3f}, Y={position['y']:.3f}, Z={position['z']:.3f}")
                         print(f"Angles: Pan={self.gimbal.current_pan:.3f}°, Tilt={self.gimbal.current_tilt:.3f}°")
                         
-                        # Prendre une photo si demandé
+                        # Take photo if requested
                         if params.get('take_photo', False):
                             self.take_photo()
                         
                     except Exception as e:
-                        print(f"Erreur lors du déplacement: {e}")
+                        print(f"Error during movement: {e}")
             
             return True
             
         except KeyboardInterrupt:
-            print("\nContrôle manuel interrompu par l'utilisateur")
+            print("\nManual control interrupted by user")
             return False
         except Exception as e:
-            print(f"\nUne erreur est survenue: {e}")
+            print(f"\nAn error occurred: {e}")
             return False
         finally:
             self.shutdown()
     
     def shutdown(self):
-        """Arrête proprement le système"""
-        print("\nArrêt du système de contrôle manuel...")
+        """Properly shut down the system"""
+        print("\nShutting down manual control system...")
         
-        # Ramener le robot à la position (0, 0, 0)
+        # Return robot to position (0, 0, 0)
         if self.cnc is not None:
             try:
-                print("Déplacement vers la position (0, 0, 0)...")
+                print("Moving to position (0, 0, 0)...")
                 self.cnc.move_to(0, 0, 0, wait=True)
                 
-                print("Retour à la position d'origine (homing)...")
+                print("Returning to home position (homing)...")
                 self.cnc.home()
             except Exception as e:
-                print(f"Erreur lors du retour à l'origine: {e}")
+                print(f"Error during homing: {e}")
         
-        # Remettre la caméra en position initiale
+        # Reset camera to initial position
         if self.gimbal is not None:
             try:
-                print("Remise de la caméra à la position initiale (0,0)...")
+                print("Resetting camera to initial position (0,0)...")
                 self.gimbal.reset_position()
             except Exception as e:
-                print(f"Erreur lors de la remise à zéro de la caméra: {e}")
+                print(f"Error resetting camera: {e}")
         
-        # Arrêter les contrôleurs dans l'ordre inverse d'initialisation
+        # Stop controllers in reverse order of initialization
         if hasattr(self, 'gimbal') and self.gimbal:
             self.gimbal.shutdown()
         
@@ -306,4 +306,4 @@ class ManualController:
             self.cnc.shutdown()
         
         self.initialized = False
-        print("Système de contrôle manuel arrêté.")
+        print("Manual control system shut down.")

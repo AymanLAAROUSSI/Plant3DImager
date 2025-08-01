@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Point d'entrée principal pour le système robotique de photographie et ciblage
+Main entry point for the robotic photography and targeting system
 """
 
 import os
@@ -11,20 +11,20 @@ import argparse
 import subprocess
 
 def main():
-    """Fonction principale"""
-    print("=== Système Robotique de Photographie et Ciblage ===")
+    """Main function"""
+    print("=== Robotic Photography and Targeting System ===")
     
-    # Créer le parseur principal
-    parser = argparse.ArgumentParser(description="Système robotique de photographie et ciblage")
+    # Create main parser
+    parser = argparse.ArgumentParser(description="Robotic photography and targeting system")
     
-    # Ajouter l'argument mode
+    # Add mode argument
     parser.add_argument("--mode", choices=["acquisition", "targeting", "manual", "sync", "workflow"], required=True,
-                      help="Mode d'exécution: acquisition d'images, ciblage de feuilles, contrôle manuel, synchronisation serveur, ou workflow complet")
+                      help="Execution mode: image acquisition, leaf targeting, manual control, server synchronization, or complete workflow")
     
-    # Parser seulement l'argument mode
+    # Parse only the mode argument
     args, remaining_args = parser.parse_known_args()
     
-    # Construire le chemin du script
+    # Build script path
     script_paths = {
         "acquisition": os.path.join("scripts", "run_acquisition.py"),
         "targeting": os.path.join("scripts", "run_targeting.py"),
@@ -35,16 +35,16 @@ def main():
     
     script_path = script_paths[args.mode]
     
-    # Vérifier que le script existe
+    # Check if script exists
     if not os.path.exists(script_path):
-        print(f"Erreur: Le script {script_path} n'existe pas.")
+        print(f"Error: Script {script_path} does not exist.")
         return 1
     
-    # Construire la commande avec tous les arguments restants
+    # Build command with all remaining arguments
     cmd = [sys.executable, script_path] + remaining_args
-    print(f"Exécution de: {' '.join(cmd)}")
+    print(f"Executing: {' '.join(cmd)}")
     
-    # Utiliser subprocess pour une meilleure gestion des arguments
+    # Use subprocess for better argument handling
     return subprocess.call(cmd)
 
 if __name__ == "__main__":

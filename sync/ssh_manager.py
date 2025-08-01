@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Gestionnaire de connexion SSH avec gestion des erreurs améliorée
+SSH connection manager with improved error handling
 """
 
 import paramiko
@@ -12,7 +12,7 @@ import logging
 from pathlib import Path
 
 class SSHManager:
-    """Gestionnaire de connexion SSH avec gestion des erreurs améliorée"""
+    """SSH connection manager with improved error handling"""
     
     def __init__(self, host, username, key_path, dry_run=False):
         self.host = host
@@ -24,13 +24,13 @@ class SSHManager:
         self.logger = logging.getLogger("sync.ssh")
         
     def connect(self):
-        """Établit la connexion SSH et SFTP"""
+        """Establish SSH and SFTP connection"""
         if self.dry_run:
-            self.logger.info("[DRY RUN] Connexion SSH simulée à %s@%s", self.username, self.host)
+            self.logger.info("[DRY RUN] Simulated SSH connection to %s@%s", self.username, self.host)
             return True
             
         try:
-            self.logger.info("Connexion à %s@%s...", self.username, self.host)
+            self.logger.info("Connecting to %s@%s...", self.username, self.host)
             self.ssh = paramiko.SSHClient()
             self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             self.ssh.connect(
@@ -40,46 +40,46 @@ class SSHManager:
                 timeout=300
             )
             
-            # Vérifier que la connexion fonctionne
+            # Check that connection works
             _, stdout, _ = self.ssh.exec_command("echo 'SSH connection test'")
             result = stdout.read().decode().strip()
             if not result:
-                self.logger.error("Test de connexion SSH échoué")
+                self.logger.error("SSH connection test failed")
                 return False
                 
             self.sftp = self.ssh.open_sftp()
-            self.logger.info("[CONNEXION] Connexion SSH/SFTP établie avec succès")
+            self.logger.info("[CONNECTION] SSH/SFTP connection established successfully")
             return True
         except Exception as e:
-            self.logger.error("❌ Erreur de connexion SSH: %s", str(e))
+            self.logger.error("❌ SSH connection error: %s", str(e))
             return False
     
     def exec_romi_command(self, command_args):
         """
-        Exécute une commande romi_run_task avec l'environnement correct
+        Execute a romi_run_task command with correct environment
         
         Args:
-            command_args: Arguments pour romi_run_task (ex: "Clean /path/to/scan --config /path/to/config")
+            command_args: Arguments for romi_run_task (e.g. "Clean /path/to/scan --config /path/to/config")
         
         Returns:
-            True si succès, False sinon, "lock_detected" si verrou détecté
+            True if successful, False otherwise, "lock_detected" if lock detected
         """
         if self.dry_run:
             self.logger.info("[SIMULATION] romi_run_task %s", command_args)
             return True
             
         if not self.ssh:
-            self.logger.error("[ERREUR] Aucune connexion SSH active")
+            self.logger.error("[ERROR] No active SSH connection")
             return False
             
         try:
-            self.logger.info("[EXÉCUTION] romi_run_task %s", command_args)
+            self.logger.info("[EXECUTION] romi_run_task %s", command_args)
             
-            # Créer un canal avec PTY pour avoir l'environnement complet
+            # Create channel with PTY for full environment
             channel = self.ssh.get_transport().open_session()
             channel.get_pty()
             
-            # Commande avec environnement correct (basé sur nos tests précédents)
+            # Command with correct environment (based on our previous tests)
             full_command = (
                 "bash -l -c '"
                 "export PYTHONPATH=/home/ayman/plant-3d-vision && "
@@ -91,7 +91,7 @@ class SSHManager:
             
             channel.exec_command(full_command)
             
-            # Afficher la sortie en temps réel et capturer pour détecter le verrou
+            # Display output in real time and capture to detect lock
             output_lines = []
             stderr_lines = []
             
@@ -109,10 +109,10 @@ class SSHManager:
                 if channel.exit_status_ready():
                     break
                     
-                time.sleep(0.1)  # Petite pause pour éviter la surcharge CPU
+                time.sleep(0.1)  # Small pause to avoid CPU overload
             
-            # Après la fin, lire tout ce qui reste
-            time.sleep(0.5)  # Attendre un peu plus pour être sûr
+            # After end, read anything remaining
+            time.sleep(0.5)  # Wait a bit longer to be sure
             while channel.recv_ready():
                 data = channel.recv(1024).decode('utf-8')
                 output_lines.append(data)
@@ -125,51 +125,51 @@ class SSHManager:
             exit_status = channel.recv_exit_status()
             channel.close()
             
-            # Vérifier s'il y a une erreur de verrou dans toute la sortie
+            # Check if there's a lock error in all output
             full_output = "".join(output_lines + stderr_lines)
             
-            # Debug: afficher ce qu'on a capturé (en mode debug uniquement)
+            # Debug: display what we captured (in debug mode only)
             if exit_status != 0:
-                self.logger.debug("Sortie capturée pour analyse: %s", full_output[:500] + "..." if len(full_output) > 500 else full_output)
+                self.logger.debug("Captured output for analysis: %s", full_output[:500] + "..." if len(full_output) > 500 else full_output)
             
-            # Détecter les différents patterns d'erreur de verrou
+            # Detect different lock error patterns
             lock_patterns = [
                 "DBBusyError",
                 "File lock exists", 
                 "DB is busy, cannot connect",
                 "File exists: '/mnt/diskSustainability/Scanner_Data/scanner_lyon/3dt_colA/lock'",
                 "FileExistsError: [Errno 17] File exists:",
-                "/lock'"  # Pattern plus simple pour le chemin du fichier lock
+                "/lock'"  # Simpler pattern for lock file path
             ]
             
             for pattern in lock_patterns:
                 if pattern in full_output:
-                    self.logger.warning("[VERROU] Détection du pattern de verrou: %s", pattern)
+                    self.logger.warning("[LOCK] Lock pattern detected: %s", pattern)
                     return "lock_detected"
             
             if exit_status == 0:
-                self.logger.info("[SUCCÈS] Commande romi_run_task réussie")
+                self.logger.info("[SUCCESS] romi_run_task command succeeded")
                 return True
             else:
-                self.logger.error("[ERREUR] Commande romi_run_task échouée avec le code %d", exit_status)
+                self.logger.error("[ERROR] romi_run_task command failed with code %d", exit_status)
                 return False
                 
         except Exception as e:
-            self.logger.error("[ERREUR] Erreur lors de l'exécution de la commande ROMI: %s", str(e))
+            self.logger.error("[ERROR] Error executing ROMI command: %s", str(e))
             return False
     
     def exec_command(self, command):
-        """Exécute une commande système simple"""
+        """Execute a simple system command"""
         if self.dry_run:
             self.logger.info("[SIMULATION] %s", command)
-            return True, "[SIMULATION] Sortie simulée"
+            return True, "[SIMULATION] Simulated output"
             
         if not self.ssh:
-            self.logger.error("[ERREUR] Aucune connexion SSH active")
-            return False, "Aucune connexion SSH"
+            self.logger.error("[ERROR] No active SSH connection")
+            return False, "No SSH connection"
             
         try:
-            self.logger.info("[COMMANDE] %s", command)
+            self.logger.info("[COMMAND] %s", command)
             stdin, stdout, stderr = self.ssh.exec_command(command, timeout=300)
             
             output = stdout.read().decode().strip()
@@ -179,150 +179,150 @@ class SSHManager:
             if exit_status == 0:
                 return True, output
             else:
-                self.logger.error("[ERREUR] Commande échouée (code %d): %s", exit_status, errors)
+                self.logger.error("[ERROR] Command failed (code %d): %s", exit_status, errors)
                 return False, errors
                 
         except Exception as e:
-            self.logger.error("[ERREUR] Erreur: %s", str(e))
+            self.logger.error("[ERROR] Error: %s", str(e))
             return False, str(e)
     
     def upload_path(self, local_path, remote_path):
-        """Upload récursif d'un fichier ou répertoire"""
+        """Recursive upload of a file or directory"""
         if self.dry_run:
             self.logger.info("[SIMULATION] Upload %s → %s", local_path, remote_path)
             return True
             
         if not self.sftp:
-            self.logger.error("[ERREUR] Aucune connexion SFTP active")
+            self.logger.error("[ERROR] No active SFTP connection")
             return False
             
         try:
             local_path = Path(local_path)
             
             if local_path.is_file():
-                # Upload simple d'un fichier
-                self.logger.info("[UPLOAD] Fichier: %s → %s", local_path.name, remote_path)
+                # Simple file upload
+                self.logger.info("[UPLOAD] File: %s → %s", local_path.name, remote_path)
                 self.sftp.put(str(local_path), remote_path)
                 return True
                 
             elif local_path.is_dir():
-                # Upload récursif d'un répertoire
-                self.logger.info("[UPLOAD] Répertoire: %s → %s", local_path.name, remote_path)
+                # Recursive directory upload
+                self.logger.info("[UPLOAD] Directory: %s → %s", local_path.name, remote_path)
                 
-                # Créer le répertoire distant
+                # Create remote directory
                 self.exec_command(f"mkdir -p '{remote_path}'")
                 
-                # Parcourir et uploader tous les fichiers
+                # Traverse and upload all files
                 for item in local_path.rglob('*'):
                     if item.is_file():
                         rel_path = item.relative_to(local_path)
                         remote_item = f"{remote_path}/{rel_path}".replace('\\', '/')
                         remote_dir = os.path.dirname(remote_item)
                         
-                        # Créer le répertoire parent si nécessaire
+                        # Create parent directory if needed
                         self.exec_command(f"mkdir -p '{remote_dir}'")
                         
-                        # Upload du fichier
+                        # Upload file
                         try:
                             self.sftp.put(str(item), remote_item)
                         except Exception as e:
-                            self.logger.error("[ERREUR] Erreur upload %s: %s", item, str(e))
+                            self.logger.error("[ERROR] Upload error %s: %s", item, str(e))
                             return False
                             
                 return True
             else:
-                self.logger.error("[ERREUR] Chemin local introuvable: %s", local_path)
+                self.logger.error("[ERROR] Local path not found: %s", local_path)
                 return False
                 
         except Exception as e:
-            self.logger.error("[ERREUR] Erreur lors de l'upload: %s", str(e))
+            self.logger.error("[ERROR] Error during upload: %s", str(e))
             return False
     
     def download_file(self, remote_path, local_path):
-        """Télécharge un fichier du serveur"""
+        """Download a file from the server"""
         if self.dry_run:
             self.logger.info("[SIMULATION] Download %s → %s", remote_path, local_path)
             return True
             
         if not self.sftp:
-            self.logger.error("[ERREUR] Aucune connexion SFTP active")
+            self.logger.error("[ERROR] No active SFTP connection")
             return False
             
         try:
-            # Créer le répertoire parent local
+            # Create local parent directory
             local_dir = os.path.dirname(local_path)
             os.makedirs(local_dir, exist_ok=True)
             
-            self.logger.info("[TÉLÉCHARGEMENT] %s → %s", remote_path, local_path)
+            self.logger.info("[DOWNLOAD] %s → %s", remote_path, local_path)
             self.sftp.get(remote_path, local_path)
             return True
         except Exception as e:
-            self.logger.error("[ERREUR] Erreur téléchargement: %s", str(e))
+            self.logger.error("[ERROR] Download error: %s", str(e))
             return False
     
     def check_and_handle_lock(self):
-        """Vérifie s'il y a un verrou et propose de le supprimer"""
+        """Check if there's a lock and offer to remove it"""
         if self.dry_run:
             return "continue"
             
-        # Vérifier l'existence du fichier de verrou
+        # Check for lock file existence
         lock_file = "/mnt/diskSustainability/Scanner_Data/scanner_lyon/3dt_colA/lock"
         check_cmd = f"test -f '{lock_file}'"
         success, _ = self.exec_command(check_cmd)
         
-        if success:  # Le fichier existe (test -f retourne 0 si le fichier existe)
-            self.logger.warning("🔒 Fichier de verrou détecté: %s", lock_file)
-            return handle_lock_removal(self)  # Retourne "exit_script" ou autre
+        if success:  # File exists (test -f returns 0 if file exists)
+            self.logger.warning("🔒 Lock file detected: %s", lock_file)
+            return handle_lock_removal(self)  # Returns "exit_script" or other
         else:
-            # Pas de verrou, on peut continuer
+            # No lock, continue
             return "continue"
     
     def close(self):
-        """Ferme les connexions"""
+        """Close connections"""
         if self.sftp:
             self.sftp.close()
         if self.ssh:
             self.ssh.close()
-        self.logger.info("🔌 Connexions fermées")
+        self.logger.info("🔌 Connections closed")
 
 
 def handle_lock_removal(ssh_manager):
-    """Gère la suppression du verrou avec confirmation utilisateur"""
+    """Handle lock removal with user confirmation"""
     print("\n" + "="*80)
-    print("ATTENTION - VERROU DE BASE DE DONNÉES DÉTECTÉ")
+    print("WARNING - DATABASE LOCK DETECTED")
     print("="*80)
-    print("La présence d'un verrou peut signifier que :")
-    print("  • Une tâche ROMI est actuellement en cours d'exécution")
-    print("  • Une tâche précédente s'est mal terminée")
-    print("  • Le système a été interrompu brutalement")
-    print("\nATTENTION: Supprimer le verrou pendant qu'une tâche s'exécute peut corrompre les données !")
+    print("The presence of a lock may indicate:")
+    print("  • A ROMI task is currently running")
+    print("  • A previous task ended abnormally")
+    print("  • The system was abruptly interrupted")
+    print("\nWARNING: Removing the lock while a task is running can corrupt data!")
     print("="*80)
     
     while True:
         try:
-            response = input("\nVoulez-vous supprimer le verrou ? (oui/non): ").strip().lower()
-            if response in ['oui', 'o', 'yes', 'y']:
-                # Supprimer le verrou
+            response = input("\nDo you want to remove the lock? (yes/no): ").strip().lower()
+            if response in ['yes', 'y']:
+                # Remove lock
                 lock_file = "/mnt/diskSustainability/Scanner_Data/scanner_lyon/3dt_colA/lock"
                 unlock_cmd = f"rm -f '{lock_file}'"
                 success, _ = ssh_manager.exec_command(unlock_cmd)
                 
                 if success:
-                    print("\n[SUCCÈS] Verrou supprimé avec succès")
-                    print("[INFO] Veuillez relancer le script pour continuer la synchronisation.")
-                    print("       Commande: python scripts/run_sync.py")
+                    print("\n[SUCCESS] Lock successfully removed")
+                    print("[INFO] Please restart the script to continue synchronization.")
+                    print("       Command: python scripts/run_sync.py")
                 else:
-                    print("\n[ERREUR] Impossible de supprimer le verrou")
-                    print("         Vérifiez les permissions ou contactez l'administrateur.")
-                return "exit_script"  # Indiquer qu'il faut sortir du script
+                    print("\n[ERROR] Unable to remove lock")
+                    print("         Check permissions or contact administrator.")
+                return "exit_script"  # Indicate to exit script
                 
-            elif response in ['non', 'n', 'no']:
-                print("\n[ARRÊT] Opération annulée. Le verrou n'a pas été supprimé.")
-                print("        La synchronisation ne peut pas continuer tant que le verrou existe.")
-                return "exit_script"  # Sortir aussi dans ce cas
+            elif response in ['no', 'n']:
+                print("\n[STOP] Operation cancelled. Lock not removed.")
+                print("        Synchronization cannot continue while the lock exists.")
+                return "exit_script"  # Exit in this case too
             else:
-                print("[ERREUR] Réponse non reconnue. Veuillez taper 'oui' ou 'non'")
+                print("[ERROR] Unrecognized response. Please type 'yes' or 'no'")
                 
         except KeyboardInterrupt:
-            print("\n\n[ARRÊT] Opération annulée par l'utilisateur")
+            print("\n\n[STOP] Operation cancelled by user")
             return "exit_script"

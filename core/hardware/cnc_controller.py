@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Contrôleur CNC unifié pour les modules d'acquisition et de ciblage
+Unified CNC controller for acquisition and targeting modules
 """
 
 import time
@@ -12,7 +12,7 @@ from romi.cnc import CNC
 class CNCController:
     def __init__(self, speed=0.1):
         """
-        Initialise le contrôleur CNC avec les paramètres spécifiés
+        Initialize the CNC controller with specified parameters
         """
         self.speed = speed
         self.cnc = None
@@ -20,132 +20,132 @@ class CNCController:
         self.initialized = False
     
     def connect(self):
-        """Connecte au CNC et l'initialise"""
+        """Connect to the CNC and initialize it"""
         if self.initialized:
             return self
         
         try:
-            print("Initialisation du CNC...")
+            print("Initializing CNC...")
             self.cnc = CNC("cnc", "cnc")
             
-            # Démarrer le CNC
-            print("Démarrage du CNC...")
+            # Start the CNC
+            print("Starting CNC...")
             self.cnc.power_up()
             
-            # Obtenir la position initiale
+            # Get initial position
             robot_pos = self.cnc.get_position()
             
-            # Convertir et stocker la position
+            # Convert and store position
             self.current_position = {
                 'x': robot_pos['x'],
                 'y': robot_pos['y'],
-                'z': -robot_pos['z']  # Inverser pour l'affichage cohérent
+                'z': -robot_pos['z']  # Invert for consistent display
             }
             
-            print(f"Position initiale: X={self.current_position['x']:.3f}, "
+            print(f"Initial position: X={self.current_position['x']:.3f}, "
                   f"Y={self.current_position['y']:.3f}, Z={self.current_position['z']:.3f}")
             
             self.initialized = True
             return self
             
         except Exception as e:
-            print(f"Erreur lors de l'initialisation du CNC: {e}")
+            print(f"Error initializing CNC: {e}")
             raise
     
     def get_position(self):
-        """Obtient la position actuelle du CNC"""
+        """Get the current position of the CNC"""
         if not self.initialized:
-            raise RuntimeError("CNC non initialisé")
+            raise RuntimeError("CNC not initialized")
         
         robot_pos = self.cnc.get_position()
         
-        # Convertir pour l'affichage cohérent
+        # Convert for consistent display
         position = {
             'x': robot_pos['x'],
             'y': robot_pos['y'],
-            'z': -robot_pos['z']  # Inverser pour l'affichage
+            'z': -robot_pos['z']  # Invert for display
         }
         
         self.current_position = position
         return position
     
     def move_to(self, x, y, z, wait=True):
-        """Déplace le CNC à la position spécifiée"""
+        """Move the CNC to the specified position"""
         if not self.initialized:
-            raise RuntimeError("CNC non initialisé")
+            raise RuntimeError("CNC not initialized")
         
         try:
-            # IMPORTANT: Inverser le signe de Z pour le contrôle du robot
-            # (nous utilisons Z positif vers le haut, le robot utilise Z positif vers le bas)
+            # IMPORTANT: Invert Z sign for robot control
+            # (we use positive Z upward, robot uses positive Z downward)
             robot_z = -z
             
-            print(f"Déplacement vers X={x:.3f}, Y={y:.3f}, Z={z:.3f}... (Robot Z={robot_z:.3f})")
+            print(f"Moving to X={x:.3f}, Y={y:.3f}, Z={z:.3f}... (Robot Z={robot_z:.3f})")
             
-            # Effectuer le mouvement
+            # Perform the movement
             self.cnc.moveto(x, y, robot_z, self.speed, wait)
             
-            # Mettre à jour la position si wait=True
+            # Update position if wait=True
             if wait:
                 self.get_position()
                 
-                print(f"Position atteinte: X={self.current_position['x']:.3f}, "
+                print(f"Position reached: X={self.current_position['x']:.3f}, "
                       f"Y={self.current_position['y']:.3f}, Z={self.current_position['z']:.3f}")
             
             return True
             
         except Exception as e:
-            print(f"Erreur lors du déplacement: {e}")
+            print(f"Error during movement: {e}")
             return False
     
     def check_movement_status(self, previous_position, tolerance=0.001):
-        """Vérifie si le CNC est encore en mouvement en comparant les positions"""
+        """Check if the CNC is still moving by comparing positions"""
         if not self.initialized:
-            raise RuntimeError("CNC non initialisé")
+            raise RuntimeError("CNC not initialized")
         
         current_position = self.get_position()
         
-        # Calculer la distance entre la position actuelle et la position précédente
+        # Calculate distance between current and previous position
         dx = current_position['x'] - previous_position['x']
         dy = current_position['y'] - previous_position['y']
         dz = current_position['z'] - previous_position['z']
         
         distance = math.sqrt(dx**2 + dy**2 + dz**2)
         
-        # Si la distance est inférieure à la tolérance, on considère que le mouvement est terminé
+        # If the distance is less than tolerance, movement is considered finished
         return distance > tolerance, current_position
     
     def home(self):
-        """Retourne à la position d'origine"""
+        """Return to home position"""
         if not self.initialized:
-            raise RuntimeError("CNC non initialisé")
+            raise RuntimeError("CNC not initialized")
         
         try:
-            print("Retour à la position d'origine (homing)...")
+            print("Returning to home position (homing)...")
             self.cnc.homing()
             return True
         except Exception as e:
-            print(f"Erreur lors du retour à l'origine: {e}")
+            print(f"Error during homing: {e}")
             return False
     
     def shutdown(self):
-        """Arrête proprement le CNC"""
+        """Properly shut down the CNC"""
         if not self.initialized:
             return True
         
         try:
-            # D'abord se déplacer à (0, 0, 0)
-            print("Déplacement vers la position (0, 0, 0)...")
+            # First move to (0, 0, 0)
+            print("Moving to position (0, 0, 0)...")
             self.move_to(0, 0, 0, wait=True)
             
-            # Puis retour à l'origine
+            # Then return to home
             self.home()
             
-            # Enfin, arrêt de l'alimentation
-            print("Arrêt du CNC...")
+            # Finally, power down
+            print("Shutting down CNC...")
             self.cnc.power_down()
             
             self.initialized = False
             return True
         except Exception as e:
-            print(f"Erreur lors de l'arrêt du CNC: {e}")
+            print(f"Error shutting down CNC: {e}")
             return False

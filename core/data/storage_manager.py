@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Gestionnaire de stockage pour les fichiers et répertoires
+Storage manager for files and directories
 """
 
 import os
@@ -13,10 +13,10 @@ from core.utils import config
 
 class StorageManager:
     def __init__(self, parent_dir=None, mode="acquisition"):
-        """Initialise le gestionnaire de stockage"""
-        # Déterminer le répertoire parent
+        """Initialize the storage manager"""
+        # Determine parent directory
         if parent_dir is None:
-            # Créer d'abord le répertoire results s'il n'existe pas
+            # First create results directory if it doesn't exist
             os.makedirs(config.RESULTS_DIR, exist_ok=True)
             
             if mode == "acquisition":
@@ -31,46 +31,46 @@ class StorageManager:
     
     def create_directory_structure(self, suffix=None):
         """
-        Crée une structure de répertoires complète pour l'exécution courante
+        Create a complete directory structure for the current execution
         
         Args:
-            suffix: Suffixe optionnel pour le nom du répertoire
+            suffix: Optional suffix for directory name
             
         Returns:
-            Dictionnaire des chemins créés
+            Dictionary of created paths
         """
-        # Créer le répertoire parent s'il n'existe pas
+        # Create parent directory if it doesn't exist
         os.makedirs(self.parent_dir, exist_ok=True)
         
-        # Générer le timestamp pour le nom du répertoire
+        # Generate timestamp for directory name
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         
-        # Créer le nom du répertoire principal
+        # Create main directory name
         if suffix:
             dir_name = f"{suffix}_{timestamp}"
         else:
             if self.mode == "acquisition":
-                dir_name = f"circular_scan_{timestamp}"  # Nom plus descriptif
+                dir_name = f"circular_scan_{timestamp}"  # More descriptive name
             else:  # targeting
-                dir_name = f"leaf_analysis_{timestamp}"  # Nom plus descriptif
+                dir_name = f"leaf_analysis_{timestamp}"  # More descriptive name
         
-        # Chemin complet du répertoire principal
+        # Full path to main directory
         main_dir = os.path.join(self.parent_dir, dir_name)
         
-        # Créer les sous-répertoires en fonction du mode
+        # Create subdirectories based on mode
         if self.mode == "acquisition":
-            # Structure pour l'acquisition
+            # Structure for acquisition
             images_dir = os.path.join(main_dir, "images")
             metadata_dir = os.path.join(main_dir, "metadata")
             metadata_images_dir = os.path.join(metadata_dir, "images")
             
-            # Créer les répertoires
+            # Create directories
             os.makedirs(main_dir, exist_ok=True)
             os.makedirs(images_dir, exist_ok=True)
             os.makedirs(metadata_dir, exist_ok=True)
             os.makedirs(metadata_images_dir, exist_ok=True)
             
-            # Stocker les chemins
+            # Store paths
             self.dirs = {
                 "main": main_dir,
                 "images": images_dir,
@@ -78,22 +78,22 @@ class StorageManager:
                 "metadata_images": metadata_images_dir
             }
             
-            print(f"Répertoire créé pour les photos: {main_dir}")
-            print(f"Sous-répertoires créés: images/, metadata/, metadata/images/")
+            print(f"Directory created for photos: {main_dir}")
+            print(f"Subdirectories created: images/, metadata/, metadata/images/")
             
         else:  # targeting
-            # Structure pour le ciblage
+            # Structure for targeting
             images_dir = os.path.join(main_dir, "images")
             analysis_dir = os.path.join(main_dir, "analysis")
             visualization_dir = os.path.join(main_dir, "visualizations")
             
-            # Créer les répertoires
+            # Create directories
             os.makedirs(main_dir, exist_ok=True)
             os.makedirs(images_dir, exist_ok=True)
             os.makedirs(analysis_dir, exist_ok=True)
             os.makedirs(visualization_dir, exist_ok=True)
             
-            # Stocker les chemins
+            # Store paths
             self.dirs = {
                 "main": main_dir,
                 "images": images_dir,
@@ -101,56 +101,56 @@ class StorageManager:
                 "visualizations": visualization_dir
             }
             
-            print(f"Répertoire créé pour les résultats: {main_dir}")
-            print(f"Sous-répertoires créés: images/, analysis/, visualizations/")
+            print(f"Directory created for results: {main_dir}")
+            print(f"Subdirectories created: images/, analysis/, visualizations/")
         
         return self.dirs
     
     def save_json(self, data, filename, subdirectory=None):
-        """Sauvegarde des données au format JSON"""
+        """Save data as JSON"""
         if self.dirs is None:
-            raise RuntimeError("Structure de répertoires non initialisée")
+            raise RuntimeError("Directory structure not initialized")
         
         try:
-            # Déterminer le chemin complet
+            # Determine full path
             if subdirectory and subdirectory in self.dirs:
                 filepath = os.path.join(self.dirs[subdirectory], filename)
             else:
                 filepath = os.path.join(self.dirs["main"], filename)
             
-            # Créer le répertoire parent si nécessaire
+            # Create parent directory if needed
             os.makedirs(os.path.dirname(filepath), exist_ok=True)
             
-            # Sauvegarder les données
+            # Save data
             with open(filepath, 'w') as f:
                 json.dump(data, f, indent=4)
                 
-            print(f"Fichier JSON sauvegardé: {filepath}")
+            print(f"JSON file saved: {filepath}")
             return filepath
         
         except Exception as e:
-            print(f"Erreur lors de la sauvegarde du fichier JSON: {e}")
+            print(f"Error saving JSON file: {e}")
             return None
     
     def save_toml(self, content, filename):
-        """Sauvegarde du contenu au format TOML"""
+        """Save content as TOML"""
         if self.dirs is None:
-            raise RuntimeError("Structure de répertoires non initialisée")
+            raise RuntimeError("Directory structure not initialized")
         
         try:
-            # Déterminer le chemin complet
+            # Determine full path
             filepath = os.path.join(self.dirs["main"], filename)
             
-            # Créer le répertoire parent si nécessaire
+            # Create parent directory if needed
             os.makedirs(os.path.dirname(filepath), exist_ok=True)
             
-            # Sauvegarder le contenu
+            # Save content
             with open(filepath, 'w') as f:
                 f.write(content)
                 
-            print(f"Fichier TOML sauvegardé: {filepath}")
+            print(f"TOML file saved: {filepath}")
             return filepath
         
         except Exception as e:
-            print(f"Erreur lors de la sauvegarde du fichier TOML: {e}")
+            print(f"Error saving TOML file: {e}")
             return None

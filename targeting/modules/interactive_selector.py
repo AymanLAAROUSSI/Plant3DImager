@@ -5,18 +5,18 @@ from mpl_toolkits.mplot3d import Axes3D
 import os
 
 def generate_distinct_colors(n):
-    """Génère n couleurs distinctes"""
+    """Generate n distinct colors"""
     colors = []
     for i in range(n):
         hue = i / n
         saturation = 0.7 + 0.3 * (i % 2)
         value = 0.8 + 0.2 * (i % 3)
         
-        # Convertir HSV en RGB en utilisant colorsys (plus sûr)
+        # Convert HSV to RGB using colorsys (safer)
         import colorsys
         r, g, b = colorsys.hsv_to_rgb(hue, saturation, value)
         
-        # S'assurer que les valeurs sont dans [0, 1]
+        # Ensure values are in [0, 1]
         r = max(0.0, min(1.0, r))
         g = max(0.0, min(1.0, g))
         b = max(0.0, min(1.0, b))
@@ -26,24 +26,24 @@ def generate_distinct_colors(n):
 
 def select_leaf_with_matplotlib(leaves_data, cloud_points, output_dir=None):
     """
-    Affiche les feuilles numérotées et permet la sélection multiple via terminal
+    Display numbered leaves and allow multiple selection via terminal
     
     Args:
-        leaves_data: Liste des données de feuilles
-        cloud_points: Points du nuage complet
-        output_dir: Répertoire de sortie pour les visualisations
+        leaves_data: List of leaf data
+        cloud_points: Complete point cloud points
+        output_dir: Output directory for visualizations
     
     Returns:
-        Liste des feuilles sélectionnées (dictionnaires) dans l'ordre spécifié
-        ou liste vide si annulé
+        List of selected leaves (dictionaries) in specified order
+        or empty list if cancelled
     """
-    print("\nPréparation de la visualisation des feuilles...")
+    print("\nPreparing leaf visualization...")
     
-    # Créer une figure 3D
+    # Create 3D figure
     fig = plt.figure(figsize=(12, 10))
     ax = fig.add_subplot(111, projection='3d')
     
-    # Afficher le nuage complet en noir (échantillonné pour performance)
+    # Display complete cloud in black (sampled for performance)
     max_display_points = 5000
     if len(cloud_points) > max_display_points:
         sample_indices = np.random.choice(len(cloud_points), max_display_points, replace=False)
@@ -52,33 +52,33 @@ def select_leaf_with_matplotlib(leaves_data, cloud_points, output_dir=None):
         display_points = cloud_points
         
     ax.scatter(display_points[:, 0], display_points[:, 1], display_points[:, 2],
-              c='black', s=1, alpha=0.4, label='Nuage de points')
+              c='black', s=1, alpha=0.4, label='Point cloud')
     
-    # Générer des couleurs distinctes pour les feuilles
+    # Generate distinct colors for leaves
     colors = generate_distinct_colors(len(leaves_data))
     
-    # Afficher chaque feuille avec son ID
+    # Display each leaf with its ID
     for i, leaf in enumerate(leaves_data):
-        # Obtenir les points de cette feuille (si disponibles)
+        # Get points for this leaf (if available)
         if 'points' in leaf:
             leaf_points = np.array(leaf['points'])
             
-            # Échantillonner si trop de points
+            # Sample if too many points
             max_leaf_points = 500
             if len(leaf_points) > max_leaf_points:
                 sample_indices = np.random.choice(len(leaf_points), max_leaf_points, replace=False)
                 leaf_points = leaf_points[sample_indices]
             
-            # Afficher les points
+            # Display points
             ax.scatter(leaf_points[:, 0], leaf_points[:, 1], leaf_points[:, 2],
-                      c=[colors[i]], s=15, label=f'Feuille {leaf["id"]}')
+                      c=[colors[i]], s=15, label=f'Leaf {leaf["id"]}')
         
-        # Afficher le centroïde
+        # Display centroid
         centroid = leaf['centroid']
         ax.scatter([centroid[0]], [centroid[1]], [centroid[2]], 
                   c=[colors[i]], s=100, marker='o', edgecolors='black')
         
-        # Afficher la normale (comme une flèche)
+        # Display normal (as arrow)
         if 'normal' in leaf:
             normal = leaf['normal']
             normal_length = 0.05  # 5 cm
@@ -91,67 +91,67 @@ def select_leaf_with_matplotlib(leaves_data, cloud_points, output_dir=None):
                      normal[0] * normal_length, normal[1] * normal_length, normal[2] * normal_length,
                      color='red', arrow_length_ratio=0.2)
         
-        # Ajouter un texte avec l'ID légèrement décalé du centroïde
-        # Calculer un décalage basé sur la normale pour que le texte soit visible
-        offset = np.array([0, 0, 0.01])  # Décalage de base (1 cm vers le haut)
+        # Add text with ID slightly offset from centroid
+        # Calculate offset based on normal to make text visible
+        offset = np.array([0, 0, 0.01])  # Base offset (1 cm upward)
         
-        # Si une normale est disponible, utiliser son orientation pour décaler perpendiculairement
+        # If normal is available, use its orientation to offset perpendicularly
         if 'normal' in leaf:
             normal = np.array(leaf['normal'])
-            # Créer un vecteur perpendiculaire à la normale
+            # Create vector perpendicular to normal
             if abs(normal[0]) > 0.1 or abs(normal[1]) > 0.1:
-                # Si la normale n'est pas verticale, on peut créer facilement un vecteur perpendiculaire
+                # If normal is not vertical, we can easily create perpendicular vector
                 perp = np.array([normal[1], -normal[0], 0])
-                perp = perp / np.linalg.norm(perp) * 0.01  # Normaliser à 1 cm
+                perp = perp / np.linalg.norm(perp) * 0.01  # Normalize to 1 cm
                 offset = perp
             else:
-                # Si la normale est presque verticale, utiliser un décalage standard
+                # If normal is almost vertical, use standard offset
                 offset = np.array([0.01, 0.01, 0.01])
         
-        # Position du texte
+        # Text position
         text_pos = np.array(centroid) + offset
         
-        # Ajouter le texte
+        # Add text
         ax.text(text_pos[0], text_pos[1], text_pos[2], 
                f"{leaf['id']}", fontsize=14, color='black', weight='bold',
                horizontalalignment='center', verticalalignment='center',
                bbox=dict(facecolor='white', alpha=0.7, edgecolor='black', boxstyle='round,pad=0.3'))
     
-    # Configurer les axes
+    # Configure axes
     ax.set_xlabel('X (m)')
     ax.set_ylabel('Y (m)')
     ax.set_zlabel('Z (m)')
-    ax.set_title('Feuilles identifiées', fontsize=16)
+    ax.set_title('Identified Leaves', fontsize=16)
     
-    # CORRECTION : Inverser les axes X et Y pour une orientation plus intuitive
-    # Cela place le point (0,0) plus près de nous
+    # CORRECTION: Invert X and Y axes for more intuitive orientation
+    # This places (0,0) closer to us
     ax.invert_xaxis()
     ax.invert_yaxis()
     
-    # CORRECTION : Ajuster la vue pour une meilleure orientation
+    # CORRECTION: Adjust view for better orientation
     ax.view_init(elev=20, azim=60)
     
-    # Afficher la légende si pas trop de feuilles
+    # Display legend if not too many leaves
     if len(leaves_data) <= 10:
         ax.legend()
     
-    # Sauvegarder l'image avant affichage
+    # Save image before display
     plt.tight_layout()
     
     if output_dir:
         visualization_path = os.path.join(output_dir, 'leaves_selection.png')
         plt.savefig(visualization_path, dpi=300)
-        print(f"Visualisation sauvegardée dans '{visualization_path}'")
+        print(f"Visualization saved to '{visualization_path}'")
     else:
         plt.savefig('leaves_selection.png', dpi=300)
-        print("Visualisation sauvegardée dans 'leaves_selection.png'")
+        print("Visualization saved to 'leaves_selection.png'")
     
-    # Afficher la figure
+    # Display figure
     plt.show()
     
-    # Afficher un tableau récapitulatif dans le terminal
-    print("\n=== FEUILLES IDENTIFIÉES ===")
-    print("ID | Centroïde (x, y, z) | Normale (x, y, z)")
+    # Display summary table in terminal
+    print("\n=== IDENTIFIED LEAVES ===")
+    print("ID | Centroid (x, y, z) | Normal (x, y, z)")
     print("-" * 65)
     
     for leaf in leaves_data:
@@ -160,27 +160,27 @@ def select_leaf_with_matplotlib(leaves_data, cloud_points, output_dir=None):
         print(f"{leaf['id']:2d} | ({centroid[0]:.3f}, {centroid[1]:.3f}, {centroid[2]:.3f}) | "
               f"({normal[0]:.3f}, {normal[1]:.3f}, {normal[2]:.3f})")
     
-    # Demander à l'utilisateur de sélectionner plusieurs feuilles
+    # Ask user to select multiple leaves
     while True:
         try:
-            selection_input = input("\nEntrez les numéros des feuilles à cibler dans l'ordre souhaité (ex: '1 4 2 8'), ou 'q' pour quitter: ")
+            selection_input = input("\nEnter leaf numbers to target in desired order (e.g. '1 4 2 8'), or 'q' to quit: ")
             
             if selection_input.lower() == 'q':
-                print("Sélection annulée.")
+                print("Selection cancelled.")
                 return []
             
-            # Diviser l'entrée par les espaces et convertir en entiers
+            # Split by spaces and convert to integers
             selected_ids = [int(id_str) for id_str in selection_input.split()]
             
-            # Vérifier si tous les IDs sont valides
+            # Check if all IDs are valid
             leaf_ids = [leaf['id'] for leaf in leaves_data]
             invalid_ids = [id for id in selected_ids if id not in leaf_ids]
             
             if invalid_ids:
-                print(f"Erreur: Les IDs suivants n'existent pas: {invalid_ids}. Veuillez réessayer.")
+                print(f"Error: The following IDs don't exist: {invalid_ids}. Please try again.")
                 continue
             
-            # Créer la liste des feuilles sélectionnées dans l'ordre spécifié
+            # Create list of selected leaves in specified order
             selected_leaves = []
             for selected_id in selected_ids:
                 for leaf in leaves_data:
@@ -189,15 +189,15 @@ def select_leaf_with_matplotlib(leaves_data, cloud_points, output_dir=None):
                         break
             
             if not selected_leaves:
-                print("Aucune feuille valide sélectionnée. Veuillez réessayer.")
+                print("No valid leaves selected. Please try again.")
                 continue
                 
-            # Afficher les feuilles sélectionnées dans l'ordre
-            print("\nFeuilles sélectionnées dans l'ordre:")
+            # Display selected leaves in order
+            print("\nSelected leaves in order:")
             for i, leaf in enumerate(selected_leaves):
-                print(f"{i+1}. Feuille {leaf['id']}")
+                print(f"{i+1}. Leaf {leaf['id']}")
             
             return selected_leaves
                 
         except ValueError:
-            print("Erreur: Format invalide. Veuillez entrer des nombres entiers séparés par des espaces.")
+            print("Error: Invalid format. Please enter integers separated by spaces.")

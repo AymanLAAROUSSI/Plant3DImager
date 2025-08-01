@@ -11,186 +11,186 @@ try:
     LOUVAIN_AVAILABLE = True
 except ImportError:
     LOUVAIN_AVAILABLE = False
-    print("ERREUR: Le package 'python-louvain' n'est pas installé.")
-    print("Pour l'installer: pip install python-louvain")
+    print("ERROR: 'python-louvain' package is not installed.")
+    print("To install: pip install python-louvain")
 
 def calculate_adaptive_radius(points):
     """
-    Calcule un rayon de connectivité adaptatif
+    Calculate adaptive connectivity radius
     """
     if len(points) < 10:
         return 0.01
     
-    # Échantillonner pour accélérer le calcul
+    # Sample to speed up calculation
     sample_size = min(1000, len(points))
     sample_indices = np.random.choice(len(points), sample_size, replace=False)
     sample_points = points[sample_indices]
     
-    # Créer un KDTree sur TOUS les points originaux
+    # Create KDTree on ALL original points
     full_tree = cKDTree(points)
     
-    # Pour chaque point échantillonné, trouver son plus proche voisin
+    # For each sampled point, find its nearest neighbor
     all_distances = []
     for point in sample_points:
-        # Chercher les 2 plus proches voisins (le premier étant le point lui-même)
+        # Find 2 nearest neighbors (first being the point itself)
         distances, _ = full_tree.query(point, k=2)
-        # Ignorer la distance à soi-même (première distance = 0)
+        # Ignore self-distance (first distance = 0)
         neighbor_distance = distances[1]
         all_distances.append(neighbor_distance)
     
-    # Calculer la distance moyenne au premier voisin le plus proche
+    # Calculate average distance to first nearest neighbor
     avg_1nn = np.mean(all_distances)
     
-    # Rayon adaptatif: 5x distance moyenne au plus proche voisin
+    # Adaptive radius: 5x average distance to nearest neighbor
     adaptive_radius = avg_1nn * 5.0
     
-    print(f"Distance 1er voisin: {avg_1nn*1000:.2f} mm")
-    print(f"Rayon adaptatif: {adaptive_radius*1000:.2f} mm")
+    print(f"1st neighbor distance: {avg_1nn*1000:.2f} mm")
+    print(f"Adaptive radius: {adaptive_radius*1000:.2f} mm")
     
     return adaptive_radius
 
 def calculate_auto_louvain_coefficient(points):
     """
-    Calcule le coefficient Louvain automatique basé sur la densité
-    Adapté de alpha_louvain_interactive.py
+    Calculate automatic Louvain coefficient based on density
+    Adapted from alpha_louvain_interactive.py
     """
-    # Calculer le volume de la bounding box
+    # Calculate bounding box volume
     min_bound = np.min(points, axis=0)
     max_bound = np.max(points, axis=0)
     dimensions = max_bound - min_bound
     volume = np.prod(dimensions)
     
-    # Calculer la densité (points par m³)
+    # Calculate density (points per m³)
     density = len(points) / volume if volume > 0 else 1
     
-    # Coefficient basé sur log10 de la densité divisé par 2
+    # Coefficient based on log10 of density divided by 2
     auto_coeff = max(0.1, np.log10(density) / 2)
     
     print(f"Points: {len(points)}")
     print(f"Volume: {volume:.6f} m³")
-    print(f"Densité: {density:.2f} points/m³")
-    print(f"Coefficient auto: {auto_coeff:.2f}")
+    print(f"Density: {density:.2f} points/m³")
+    print(f"Auto coefficient: {auto_coeff:.2f}")
     
     return auto_coeff
 
 def build_connectivity_graph(points, radius):
     """
-    Construit le graphe de connectivité
-    Adapté de alpha_louvain_interactive.py
+    Build connectivity graph
+    Adapted from alpha_louvain_interactive.py
     """
     start_time = time.time()
     
-    # Créer un graphe vide
+    # Create empty graph
     graph = nx.Graph()
     
-    # Ajouter les nœuds (un par point)
+    # Add nodes (one per point)
     for i in range(len(points)):
         graph.add_node(i)
     
-    # Utiliser un KDTree pour la recherche efficace des voisins
+    # Use KDTree for efficient neighbor search
     tree = cKDTree(points)
     
-    # Pour chaque point, trouver ses voisins dans le rayon spécifié
+    # For each point, find neighbors within specified radius
     for i in range(len(points)):
-        # Trouver les indices des voisins
+        # Find indices of neighbors
         indices = tree.query_ball_point(points[i], radius)
         
-        # Ajouter des arêtes vers les voisins
+        # Add edges to neighbors
         for j in indices:
-            if i < j:  # Pour éviter les doublons
-                # Calculer la distance euclidienne
+            if i < j:  # To avoid duplicates
+                # Calculate Euclidean distance
                 dist = np.linalg.norm(points[i] - points[j])
                 
-                # Le poids est l'inverse de la distance
+                # Weight is inverse of distance
                 weight = 1.0 / max(dist, 1e-6)
                 
                 graph.add_edge(i, j, weight=weight)
         
-        # Afficher la progression
+        # Display progress
         if i % 5000 == 0 or i == len(points) - 1:
-            print(f"  Progression: {i+1}/{len(points)} points")
+            print(f"  Progress: {i+1}/{len(points)} points")
     
-    print(f"Graphe: {graph.number_of_nodes()} nœuds, {graph.number_of_edges()} arêtes")
-    print(f"Temps: {time.time() - start_time:.2f}s")
+    print(f"Graph: {graph.number_of_nodes()} nodes, {graph.number_of_edges()} edges")
+    print(f"Time: {time.time() - start_time:.2f}s")
     
     return graph
 
 def detect_communities_louvain_multiple(graph, resolution, min_size, n_iterations=5):
     """
-    Détecte les communautés avec Louvain randomisé
-    Adapté de alpha_louvain_interactive.py
+    Detect communities with randomized Louvain
+    Adapted from alpha_louvain_interactive.py
     """
     if not LOUVAIN_AVAILABLE:
-        print("Erreur: Module python-louvain non disponible")
+        print("Error: python-louvain module not available")
         return []
         
     if n_iterations <= 0:
-        print("ERREUR: Le nombre d'itérations doit être positif.")
+        print("ERROR: Number of iterations must be positive.")
         return []
     
     best_partition = None
     best_modularity = -1
     best_communities = []
     
-    print(f"Exécution de Louvain {n_iterations} fois avec ordre aléatoire...")
+    print(f"Running Louvain {n_iterations} times with random order...")
     
-    # Créer une copie du graphe pour ne pas le modifier
+    # Create copy of graph to avoid modifying it
     graph_copy = graph.copy()
     
     for i in range(n_iterations):
         start_time = time.time()
         
-        # Réordonner aléatoirement les nœuds
+        # Randomly reorder nodes
         shuffled_nodes = list(graph_copy.nodes())
         random.shuffle(shuffled_nodes)
         
-        # Créer un dictionnaire de correspondance
+        # Create mapping dictionary
         node_map = {old: new for new, old in enumerate(shuffled_nodes)}
         reverse_map = {new: old for new, old in enumerate(shuffled_nodes)}
         
-        # Créer un nouveau graphe avec les nœuds réordonnés
+        # Create new graph with reordered nodes
         shuffled_graph = nx.Graph()
         for old_u, old_v, data in graph_copy.edges(data=True):
             new_u, new_v = node_map[old_u], node_map[old_v]
             shuffled_graph.add_edge(new_u, new_v, **data)
         
-        # Exécuter Louvain sur le graphe réordonné
+        # Run Louvain on reordered graph
         partition = community_louvain.best_partition(shuffled_graph, resolution=resolution)
         
-        # Calculer la modularité de cette partition
+        # Calculate modularity of this partition
         modularity = community_louvain.modularity(partition, shuffled_graph)
         
-        # Mapper la partition aux nœuds originaux
+        # Map partition to original nodes
         original_partition = {reverse_map[node]: comm for node, comm in partition.items()}
         
-        # Si c'est la meilleure modularité jusqu'à présent, on la garde
+        # If this is best modularity so far, keep it
         if modularity > best_modularity:
             best_modularity = modularity
             best_partition = original_partition
         
-        print(f"  Itération {i+1}/{n_iterations}: Modularité = {modularity:.4f}, Temps = {time.time() - start_time:.2f}s")
+        print(f"  Iteration {i+1}/{n_iterations}: Modularity = {modularity:.4f}, Time = {time.time() - start_time:.2f}s")
     
-    print(f"Meilleure modularité: {best_modularity:.4f}")
+    print(f"Best modularity: {best_modularity:.4f}")
     
-    # Regrouper les nœuds par communauté
+    # Group nodes by community
     communities = {}
     for node, community_id in best_partition.items():
         if community_id not in communities:
             communities[community_id] = set()
         communities[community_id].add(node)
     
-    # Filtrer les communautés trop petites
+    # Filter out communities that are too small
     filtered_communities = [comm for comm in communities.values() if len(comm) >= min_size]
     
-    # Trier par taille décroissante
+    # Sort by decreasing size
     sorted_communities = sorted(filtered_communities, key=len, reverse=True)
     
-    print(f"Communautés totales: {len(communities)}")
-    print(f"Communautés >= {min_size} points: {len(filtered_communities)}")
+    print(f"Total communities: {len(communities)}")
+    print(f"Communities >= {min_size} points: {len(filtered_communities)}")
     
-    # Afficher des statistiques sur les communautés
+    # Display statistics about communities
     if sorted_communities:
-        print("Top 5 communautés:")
+        print("Top 5 communities:")
         for i, comm in enumerate(sorted_communities[:5]):
             print(f"  {i+1}: {len(comm)} points")
     
@@ -198,20 +198,20 @@ def detect_communities_louvain_multiple(graph, resolution, min_size, n_iteration
 
 def fit_plane_to_points(points, all_points=None, distance_threshold=0.005, ransac_n=3, num_iterations=1000):
     """
-    Ajuste un plan à un ensemble de points via RANSAC et oriente la normale vers l'extérieur
+    Fit plane to a set of points via RANSAC and orient normal outward
     
     Args:
-        points: Points de la communauté (feuille)
-        all_points: Tous les points du nuage (pour calculer le centre de la plante)
-        distance_threshold: Seuil de distance pour RANSAC
-        ransac_n: Nombre de points pour RANSAC
-        num_iterations: Nombre d'itérations pour RANSAC
+        points: Community points (leaf)
+        all_points: All cloud points (to calculate plant center)
+        distance_threshold: Distance threshold for RANSAC
+        ransac_n: Number of points for RANSAC
+        num_iterations: Number of iterations for RANSAC
         
     Returns:
-        Dictionnaire avec les informations du plan
+        Dictionary with plane information
     """
     if len(points) < 3:
-        print("Pas assez de points pour ajuster un plan")
+        print("Not enough points to fit plane")
         return {
             'normal': np.array([0, 0, 1]),
             'centroid': np.mean(points, axis=0) if len(points) > 0 else np.array([0, 0, 0]),
@@ -220,57 +220,57 @@ def fit_plane_to_points(points, all_points=None, distance_threshold=0.005, ransa
             'inliers': []
         }
     
-    # Déterminer le centre de la plante (centroïde de tous les points)
+    # Determine plant center (centroid of all points)
     if all_points is None:
-        # Si all_points n'est pas fourni, utiliser le centroïde des points XY comme référence
-        # mais avec une hauteur Z minimale
+        # If all_points not provided, use XY centroid of points as reference
+        # but with minimum Z height
         xy_centroid = np.mean(points[:, :2], axis=0)
         min_z = np.min(points[:, 2])
         plant_center = np.array([xy_centroid[0], xy_centroid[1], min_z])
     else:
-        # Utiliser le centroïde de tous les points comme centre de la plante
+        # Use centroid of all points as plant center
         plant_center = np.mean(all_points, axis=0)
     
-    # Créer un nuage de points Open3D
+    # Create Open3D point cloud
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(points)
     
-    # Estimer les normales
+    # Estimate normals
     pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.02, max_nn=30))
     
-    # Ajuster un plan avec RANSAC
+    # Fit plane with RANSAC
     try:
         plane_model, inliers = pcd.segment_plane(distance_threshold=distance_threshold,
                                                ransac_n=ransac_n,
                                                num_iterations=num_iterations)
         
-        # Extraire les paramètres du plan: ax + by + cz + d = 0
+        # Extract plane parameters: ax + by + cz + d = 0
         [a, b, c, d] = plane_model
         
-        # Normaliser le vecteur normal
+        # Normalize normal vector
         normal = np.array([a, b, c])
         normal_length = np.linalg.norm(normal)
         if normal_length > 0:
             normal = normal / normal_length
         
-        # Calculer le pourcentage d'inliers
+        # Calculate inlier percentage
         inlier_ratio = len(inliers) / len(points) if len(points) > 0 else 0
         
-        # Calculer le barycentre
+        # Calculate centroid
         centroid = np.mean(points, axis=0)
         
-        # Vérifier l'orientation de la normale (pour qu'elle pointe "vers l'extérieur")
+        # Check normal orientation (to point "outward")
         direction_to_center = plant_center - centroid
         
-        # Si la normale pointe vers le centre, l'inverser
-        # Utiliser une marge pour éviter les cas limites
+        # If normal points toward center, invert it
+        # Use margin to avoid edge cases
         dot_product = np.dot(normal, direction_to_center)
         if dot_product > 0.1 * np.linalg.norm(direction_to_center):
             normal = -normal
             a, b, c = -a, -b, -c
             d = -d
         
-        # Créer le dictionnaire de résultats
+        # Create results dictionary
         plane_info = {
             'normal': normal,
             'centroid': centroid,
@@ -282,8 +282,8 @@ def fit_plane_to_points(points, all_points=None, distance_threshold=0.005, ransa
         return plane_info
         
     except Exception as e:
-        print(f"Erreur lors de l'ajustement du plan: {e}")
-        # Retourner une normale par défaut (vers le haut)
+        print(f"Error fitting plane: {e}")
+        # Return default normal (upward)
         return {
             'normal': np.array([0, 0, 1]),
             'centroid': np.mean(points, axis=0),
@@ -294,79 +294,79 @@ def fit_plane_to_points(points, all_points=None, distance_threshold=0.005, ransa
 
 def calculate_target_point(leaf_data, distance=0.10):
     """
-    Calcule le point cible à une distance donnée du plan de la feuille
+    Calculate target point at given distance from leaf plane
     
     Args:
-        leaf_data: Dictionnaire contenant les données de la feuille
-        distance: Distance souhaitée du plan (en mètres)
+        leaf_data: Dictionary containing leaf data
+        distance: Desired distance from plane (in meters)
     
     Returns:
-        Coordonnées du point cible [x, y, z]
+        Target point coordinates [x, y, z]
     """
     centroid = np.array(leaf_data['centroid'])
     normal = np.array(leaf_data['normal'])
     
-    # Calculer le point cible en suivant la normale
+    # Calculate target point by following normal
     target_point = centroid + normal * distance
     
     return target_point.tolist()
 
 def extract_leaf_data_from_communities(communities, points, min_inlier_ratio=0.7, distance=0.1):
     """
-    Extrait les données des feuilles à partir des communautés détectées
+    Extract leaf data from detected communities
     
     Args:
-        communities: Liste des communautés (ensemble d'indices)
-        points: Nuage de points complet
-        min_inlier_ratio: Ratio minimum d'inliers pour considérer une surface comme valide
-        distance: Distance aux feuilles en mètres pour le calcul des points cibles
+        communities: List of communities (sets of indices)
+        points: Complete point cloud
+        min_inlier_ratio: Minimum inlier ratio to consider surface valid
+        distance: Distance to leaves in meters for target point calculation
     
     Returns:
-        Liste des données de feuilles au format standardisé
+        List of leaf data in standardized format
     """
     leaves_data = []
     
-    # Calculer le centre approximatif de la plante
+    # Calculate approximate plant center
     plant_center = np.mean(points, axis=0)
-    # Utiliser une hauteur minimale pour le centre (base de la plante)
+    # Use minimum height for center (plant base)
     plant_center[2] = np.min(points[:, 2])
     
-    print(f"\nUtilisation d'une distance de {distance*100:.1f} cm pour calculer les points cibles")
+    print(f"\nUsing distance of {distance*100:.1f} cm for target point calculation")
     
     for i, community in enumerate(communities):
-        # Extraire les points de cette communauté
+        # Extract points for this community
         comm_indices = list(community)
         comm_points = points[comm_indices]
         
-        # Calculer le centroïde
+        # Calculate centroid
         centroid = np.mean(comm_points, axis=0)
         
-        # Ajuster un plan à la communauté en passant tous les points
+        # Fit plane to community passing all points
         plane_info = fit_plane_to_points(comm_points, points)
         
-        # Vérifier si le plan est de bonne qualité
+        # Check if plane is good quality
         if plane_info['inlier_ratio'] < min_inlier_ratio:
-            print(f"Communauté {i+1}: Ratio d'inliers trop faible ({plane_info['inlier_ratio']:.2f})")
+            print(f"Community {i+1}: Inlier ratio too low ({plane_info['inlier_ratio']:.2f})")
             continue
         
-        # Double vérification de l'orientation de la normale vers l'extérieur
+        # Double-check normal orientation outward
         direction_to_center = plant_center - centroid
         dot_product = np.dot(plane_info['normal'], direction_to_center)
         if dot_product > 0:
-            # La normale pointe encore vers le centre - l'inverser
+            # Normal still points toward center - invert it
             normal = -np.array(plane_info['normal'])
             plane_info['normal'] = normal
-            # Inverser aussi l'équation du plan
+            # Also invert plane equation
             a, b, c, d = plane_info['equation']
             plane_info['equation'] = [-a, -b, -c, -d]
-            print(f"Communauté {i+1}: Normale réorientée vers l'extérieur")
+            print(f"Community {i+1}: Normal reoriented outward")
         
-        # Calculer le point cible à la distance spécifiée de la feuille
+        # Calculate target point at specified distance from leaf
         target_point = calculate_target_point(plane_info, distance=distance)
         
-        # Créer l'entrée pour cette feuille
+        # Create entry for this leaf
         leaf_data = {
-            "id": i + 1,  # ID commençant à 1
+            "id": i + 1,  # ID starting at 1
             "centroid": centroid.tolist(),
             "normal": plane_info["normal"].tolist(),
             "plane_equation": plane_info["equation"],
@@ -378,5 +378,5 @@ def extract_leaf_data_from_communities(communities, points, min_inlier_ratio=0.7
         
         leaves_data.append(leaf_data)
     
-    print(f"Feuilles extraites: {len(leaves_data)}")
+    print(f"Extracted leaves: {len(leaves_data)}")
     return leaves_data

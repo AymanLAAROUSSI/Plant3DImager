@@ -2,21 +2,21 @@
 # -*- coding: utf-8 -*-
 
 """
-Module de chargement de la configuration JSON partagée entre les modules d'acquisition et de ciblage
+JSON configuration loading module shared between acquisition and targeting modules
 """
 
 import json
 import os
 import sys
 
-# Chemin vers le fichier de configuration - à la racine du projet
+# Path to configuration file - at project root
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'config.json')
 
-# Variables globales pour stocker la configuration
+# Global variables to store configuration
 _config_data = {}
 _config_loaded = False
 
-# Valeurs par défaut
+# Default values
 _defaults = {
     "TARGET_POINT": [0.375, 0.35, 0.30],
     "CENTER_POINT": [0.375, 0.35, 0.00],
@@ -41,7 +41,7 @@ _defaults = {
 
 def _load_config():
     """
-    Charge la configuration à partir du fichier JSON
+    Load configuration from JSON file
     """
     global _config_data, _config_loaded
     
@@ -49,40 +49,40 @@ def _load_config():
         with open(CONFIG_FILE, 'r') as f:
             _config_data = json.load(f)
         _config_loaded = True
-        print(f"Configuration chargée depuis {CONFIG_FILE}")
+        print(f"Configuration loaded from {CONFIG_FILE}")
     except FileNotFoundError:
-        print(f"Fichier de configuration non trouvé: {CONFIG_FILE}")
-        print("Création du fichier avec les valeurs par défaut...")
+        print(f"Configuration file not found: {CONFIG_FILE}")
+        print("Creating file with default values...")
         _config_data = _defaults.copy()
         save_config(_config_data)
         _config_loaded = True
     except json.JSONDecodeError as e:
-        print(f"Erreur de format dans le fichier de configuration: {e}")
-        print("Utilisation des valeurs par défaut")
+        print(f"Format error in configuration file: {e}")
+        print("Using default values")
         _config_data = _defaults.copy()
         _config_loaded = False
 
 def get(key, default=None):
     """
-    Retourne la valeur de configuration pour la clé spécifiée
+    Returns the configuration value for the specified key
     
     Args:
-        key: Clé de configuration
-        default: Valeur par défaut si la clé n'existe pas
+        key: Configuration key
+        default: Default value if key doesn't exist
     
     Returns:
-        Valeur de configuration
+        Configuration value
     """
     if not _config_loaded:
         _load_config()
     
-    # Utiliser la valeur par défaut fournie ou celle des _defaults
+    # Use provided default value or the one from _defaults
     if default is None and key in _defaults:
         default = _defaults[key]
         
     value = _config_data.get(key, default)
     
-    # Convertir les listes en tuples pour certaines clés
+    # Convert lists to tuples for certain keys
     if key in ["TARGET_POINT", "CENTER_POINT"] and isinstance(value, list):
         value = tuple(value)
         
@@ -90,13 +90,13 @@ def get(key, default=None):
 
 def save_config(config_dict):
     """
-    Sauvegarde les modifications de configuration dans le fichier JSON
+    Save configuration changes to JSON file
     
     Args:
-        config_dict: Dictionnaire contenant les nouvelles valeurs de configuration
+        config_dict: Dictionary containing new configuration values
     
     Returns:
-        True si la sauvegarde est réussie, False sinon
+        True if save is successful, False otherwise
     """
     global _config_data
     
@@ -104,23 +104,23 @@ def save_config(config_dict):
         if not _config_loaded:
             _load_config()
         
-        # Mettre à jour la configuration avec les nouvelles valeurs
+        # Update configuration with new values
         _config_data.update(config_dict)
         
-        # Sauvegarder la configuration mise à jour
+        # Save updated configuration
         with open(CONFIG_FILE, 'w') as f:
             json.dump(_config_data, f, indent=4)
             
-        print(f"Configuration sauvegardée dans {CONFIG_FILE}")
+        print(f"Configuration saved to {CONFIG_FILE}")
         return True
     except Exception as e:
-        print(f"Erreur lors de la sauvegarde de la configuration: {e}")
+        print(f"Error saving configuration: {e}")
         return False
 
-# Charger la configuration au démarrage
+# Load configuration at startup
 _load_config()
 
-# Exposer les variables de configuration comme attributs du module
+# Expose configuration variables as module attributes
 TARGET_POINT = get("TARGET_POINT")
 CENTER_POINT = get("CENTER_POINT")
 CIRCLE_RADIUS = get("CIRCLE_RADIUS")
