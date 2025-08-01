@@ -40,12 +40,21 @@ plant_robotics_system/
 │   ├── __init__.py
 │   └── manual_controller.py           # Classe principale de contrôle manuel
 │
+├── sync/                              # Module de synchronisation serveur
+│   ├── __init__.py
+│   ├── server_sync.py                 # Classe principale de synchronisation
+│   └── ssh_manager.py                 # Gestion des connexions SSH
+│
 ├── scripts/                           # Scripts d'exécution
 │   ├── run_acquisition.py             # Lancement de l'acquisition
 │   ├── run_targeting.py               # Lancement du ciblage
-│   └── run_manual.py                  # Lancement du contrôle manuel
+│   ├── run_manual.py                  # Lancement du contrôle manuel
+│   ├── run_sync.py                    # Lancement de la synchronisation
+│   └── run_workflow.py                # Lancement du workflow complet
 │
 ├── main.py                            # Point d'entrée principal
+│
+├── config.json                        # Configuration globale en JSON
 │
 └── results/                           # Répertoire pour tous les résultats
     ├── plant_acquisition/             # Résultats d'acquisition
@@ -62,25 +71,21 @@ plant_robotics_system/
     │       ├── analysis/              # Données d'analyse
     │       └── visualizations/        # Visualisations
     │
-    └── manual_control/                # Photos prises en mode manuel
+    ├── manual_control/                # Photos prises en mode manuel
+    │
+    └── pointclouds/                   # Nuages de points récupérés
 
 Points d'entrée et modes d'exécution : 
 -- main.py : 
 # Mode acquisition d'images en cercle
-python main.py --mode acquisition [--args --circles 2 --positions 60]
-
 # Mode ciblage de feuilles
-python main.py --mode targeting [--args /chemin/vers/nuage.ply]
-
 # Mode contrôle manuel
-python main.py --mode manual
+# Mode synchronisation serveur
+# Mode workflow complet
 
 -- Scripts directs :
 # Acquisition
-python scripts/run_acquisition.py --circles 2 --positions 60
-
 # Ciblage
-python scripts/run_targeting.py /chemin/vers/nuage.ply
-
 # Contrôle manuel
-python scripts/run_manual.py
+# Synchronisation
+# Workflow complet

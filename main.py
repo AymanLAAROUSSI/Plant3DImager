@@ -18,8 +18,8 @@ def main():
     parser = argparse.ArgumentParser(description="Système robotique de photographie et ciblage")
     
     # Ajouter l'argument mode
-    parser.add_argument("--mode", choices=["acquisition", "targeting", "manual", "sync"], required=True,
-                      help="Mode d'exécution: acquisition d'images, ciblage de feuilles, contrôle manuel, ou synchronisation serveur")
+    parser.add_argument("--mode", choices=["acquisition", "targeting", "manual", "sync", "workflow"], required=True,
+                      help="Mode d'exécution: acquisition d'images, ciblage de feuilles, contrôle manuel, synchronisation serveur, ou workflow complet")
     
     # Parser seulement l'argument mode
     args, remaining_args = parser.parse_known_args()
@@ -29,7 +29,8 @@ def main():
         "acquisition": os.path.join("scripts", "run_acquisition.py"),
         "targeting": os.path.join("scripts", "run_targeting.py"),
         "manual": os.path.join("scripts", "run_manual.py"),
-        "sync": os.path.join("scripts", "run_sync.py")
+        "sync": os.path.join("scripts", "run_sync.py"),
+        "workflow": os.path.join("scripts", "run_workflow.py")
     }
     
     script_path = script_paths[args.mode]
